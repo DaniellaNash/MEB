@@ -1,0 +1,982 @@
+#include<stdio.h>         //to use the printf function
+#include<conio.h>         //to use the getche function
+#include<stdlib.h>        //to use the rand function
+#include<math.h>          //to use the pow function
+#include<time.h>          //to use the time function
+
+//define variables
+
+//Limits on user input parameter values
+#define MAX_CHROMO_SIZE             20 //the number of edges = number of nodes -1
+#define MIN_CHROMO_SIZE             2
+#define MAX_POP_SIZE                500
+#define MIN_POP_SIZE                4
+
+#define MAX_MUTATION_RATE           1
+#define MIN_MUTATION_RATE           0
+#define MAX_TX_DISTANCE             999
+//Standard values
+#define MAX_GENERATIONS             300
+
+// creating the chrom structure
+typedef struct Chrom
+{
+    short int gene[MAX_CHROMO_SIZE];
+    float fitness_score;
+} chrom;   // a chrom type
+
+//creating the Edge structure
+typedef struct Edge
+{
+    float value;//energy of each edge
+    float weight;//coordinates x,y
+} edge;
+
+void intro_objective_function (void);
+int generate_rand(int Min, int Max);
+float generate_rand_float(void);
+int get_restart(void);
+
+//get the parameter variables
+int get_num_generation(void);
+int get_population_size(void);
+int get_chromosome_size(void);//the number of edges = number of nodes - 1
+float get_mutation_rate(void);
+
+//get the strategy
+int get_selection_strategy(void);
+int get_crossover_strategy(void);
+int get_mutation_strategy(void);
+
+void *item_data(int chrom_size, edge edge_energy[]);
+float total_value(chrom next_population, int chrom_size,edge edge_energy[]);
+float total_energy(chrom next_population, int chrom_size,edge edge_energy[]);
+float Objective_function(chrom next_population, int chrom_size,edge edge_energy[]);
+
+void *binary_population(chrom current_population[],int pop_size, int chrom_size);
+
+//select strategy for each operator
+void *do_selection_operator(int selection,chrom next_population[],int chrom_size, int pop_size,edge edge_energy[]);
+void *do_crossover_operator(int crossover,chrom next_population[],int chrom_size, int pop_size,edge edge_energy[]);
+void *do_mutation_operator(int mutation,chrom next_population[],int chrom_size, int pop_size,float mutation_rate,edge edge_energy[]);
+
+//selection strategies
+void *selection_roulettewheel(int pop_size,chrom next_population[], int chrom_size,edge edge_energy[]);
+void *selection_tournament(int pop_size,chrom next_population[], int chrom_size,edge edge_energy[]);
+void *selection_elitism_sort(int pop_size,chrom next_population[],int chrom_size,int show,edge edge_energy[]);
+void *selection_rank(int pop_size,chrom next_population[], int chrom_size,edge edge_energy[]);
+
+//crossover strategies
+void *crossover_singlepoint(chrom next_population[],int pop_size,int chrom_size,edge edge_energy[]);
+void *crossover_doublepoint(chrom next_population[],int pop_size,int chrom_size,edge edge_energy[]);
+void *crossover_uniform(chrom next_population[],int pop_size,int chrom_size,edge edge_energy[]);
+void *crossover_halfuniform(chrom next_population[],int pop_size,int chrom_size,edge edge_energy[]);
+
+//mutation strategies
+void *mutation_bitstring(int chrom_size, int pop_size, chrom next_population[],float mutation_rate,edge edge_energy[]);
+void *mutation_bitflip(int chrom_size, int pop_size, chrom next_population[],float mutation_rate,edge edge_energy[]);
+void *mutation_orderchanging(int chrom_size, int pop_size, chrom next_population[],float mutation_rate,edge edge_energy[]);
+
+
+int main()
+{
+    int i,j;
+    int restart=0,show=0;
+    int current_generation, num_gen;
+    int pop_size, chrom_size;
+    float mutation_rate;
+    float sum_energy;
+    int selection, crossover, mutation;
+
+    FILE *fp;
+
+    //creating new file with write mode
+    fp=fopen("test.txt","w");
+    if(fp==NULL)
+    {
+        printf("Error!");
+        exit(1);
+    }
+    fprintf(fp,"%s %s\t%s %s\t\t%s %s\t%s\n" ,"Generation","number","Fitness",
+            "Score","Total","energy","BINARY");
+
+    srand(time(NULL));// refresh random values at every execution
+
+    do
+    {
+        intro_objective_function (); //introduction plus the objective function declaration
+        num_gen = get_num_generation();        // get the stopping criterion
+        pop_size = get_population_size();
+        chrom_size = get_chromosome_size();  //get number of edges = number of nodes - 1
+        mutation_rate = get_mutation_rate();
+
+        selection = get_selection_strategy(); // get strategies for the operators
+        crossover = get_crossover_strategy();
+        mutation = get_mutation_strategy();
+
+        chrom current_population[pop_size];//initialize the population arrays
+        chrom next_population[pop_size];
+        edge edge_energy[chrom_size];
+
+        binary_population(current_population,pop_size,chrom_size); //binary representation
+        item_data(chrom_size,edge_energy);
+
+        for(current_generation=1; current_generation<num_gen+1 ; current_generation++) // iterate for the number of generations wanted
+        {
+            printf("\n\n\n\tGeneration number: %d\n\n",current_generation); // print the iteration number
+
+            for(j=1; j<pop_size+1; j++)
+            {
+                next_population[j]=current_population[j];//copy current population to next population in order to adjust it
+
+                printf("\n\tchromosome[%d] = ",j);
+                for(i=0; i<chrom_size; i++)
+                {
+                    printf("%d",next_population[j].gene[i]);
+                }
+
+                next_population[j].fitness_score = Objective_function(next_population[j],chrom_size,edge_energy); //fitness score of chromosome
+                printf(" fitness=%f",next_population[j].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+            }
+
+            selection_elitism_sort(pop_size, next_population,  chrom_size, show, edge_energy);
+            sum_energy = total_energy(next_population[1],chrom_size,edge_energy);
+
+            fprintf(fp,"\n\t\t%i\t\t\t%f\t\t%f\t\t",current_generation,next_population[1].fitness_score,sum_energy );
+            printf("\n\n\t\tbest chromosome: ");
+            for(i=0; i<chrom_size; i++)
+            {
+                fprintf(fp,"%d",next_population[1].gene[i]);
+                printf("%d",next_population[1].gene[i]);
+            }
+
+            //selection function
+            do_selection_operator(selection,next_population,chrom_size,pop_size, edge_energy);
+            //crossover function
+            do_crossover_operator(crossover,next_population,chrom_size, pop_size, edge_energy);
+            //mutation function
+            do_mutation_operator(mutation,next_population,chrom_size,pop_size, mutation_rate, edge_energy);
+
+            for(i=1; i<pop_size+1; i++)
+            {
+                current_population[i]=next_population[i]; //copy the chromes of next population to current populatio
+            }
+        }
+        restart = get_restart();
+    }
+    while(restart==1);
+    //closing the file from write mode
+    fclose(fp);
+
+    fflush(NULL);
+    return 0;
+}
+
+void *mutation_bitflip(int chrom_size, int pop_size, chrom next_population[],float mutation_rate,edge edge_energy[])//commented
+{
+    int i,j;
+    float random;
+    int mutation_detected=0;
+
+    printf("\n\n\tBitflip mutation:");
+
+    for(i=1; i<pop_size+1; i++)
+    {
+        for(j=0; j<chrom_size; j++) // for each gene of the chromosomes check if it is mutated
+        {
+            random = generate_rand_float();//create random value between 0 and 1
+            random = generate_rand_float();
+            if (random<mutation_rate)
+            {
+                mutation_detected =1;
+                if(next_population[i].gene[j]==1)//if the gene was 1, flip it to 0
+                    next_population[i].gene[j]=0;
+                else if (next_population[i].gene[j]==0)//if the gene was 0, flip it to 1
+                    next_population[i].gene[j]=1;
+                printf("\n\tmutated chromosome %d gene %d",i,j+1);
+            }
+        }
+    }
+    if(mutation_detected==1)//if mutation occurs
+    {
+        for(i=1; i<pop_size+1; i++)
+        {
+            //printf("\n\tchromosome[%d] = ",i);//print out new chromosome order
+            for(j=0; j<chrom_size; j++)
+            {
+                //printf("%d",next_population[i].gene[j]);
+            }
+            next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+            //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+        }
+    }
+    else
+        printf(" N/A");
+
+        return(0);
+}
+
+void *mutation_bitstring(int chrom_size, int pop_size, chrom next_population[],float mutation_rate,edge edge_energy[])
+{
+    int i,j;
+    float random;
+    int rand_gene, rand_chrom;
+
+    //printf("\n\n\tBit string mutation:");
+
+    random = generate_rand_float();//get value between 0 and 1
+
+    if (random<mutation_rate) //mutation rate of 1%
+    {
+        rand_chrom = generate_rand(1,pop_size); // choose random chromosome
+        rand_gene = generate_rand(0,chrom_size-1); //choose random gene
+
+        if(next_population[rand_chrom].gene[rand_gene]==1)//if the gene was 1, flip it to 0
+        {
+            next_population[rand_chrom].gene[rand_gene]=0;
+        }
+        else if (next_population[rand_chrom].gene[rand_gene]==0)//if the gene was 0, flip it to 1
+        {
+            next_population[rand_chrom].gene[rand_gene]=1;
+        }
+        //printf("\n\tmutated chromosome %d, gene %d\n",rand_chrom,rand_gene+1);
+
+        for(i=1; i<pop_size+1; i++)
+        {
+            //printf("\n\tchromosome[%d] = ",i);//print out new chromosome order
+            for(j=0; j<chrom_size; j++)
+            {
+                //printf("%d",next_population[i].gene[j]);
+            }
+
+            next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+            //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+
+        }
+    }
+    else
+        printf(" N/A");
+
+        return(0);
+}
+
+void *mutation_orderchanging(int chrom_size, int pop_size, chrom next_population[],float mutation_rate,edge edge_energy[])
+{
+    int i,j;
+    float random;
+    int mutation_detected=0;
+    int rand_gene_1,rand_gene_2;
+    chrom temporary[pop_size];
+
+    //printf("\n\n\tOrder changing mutation:");
+
+    for(i=1; i<pop_size+1; i++) //for each chromosome
+    {
+        random = generate_rand_float();//create random value between 0 and 1
+
+        if (random<mutation_rate) //mutation rate of 1%
+        {
+            mutation_detected =1;
+            rand_gene_1 = generate_rand(0,chrom_size-1); //choose a random pair of genes
+            rand_gene_2 = rand_gene_1;
+            do //make sure the genes are different
+            {
+                rand_gene_2 = generate_rand(0,chrom_size-1);
+            }
+            while (rand_gene_1==rand_gene_2);
+
+            temporary[i].gene[rand_gene_1] = next_population[i].gene[rand_gene_1]; // store random gene pair in temp
+            temporary[i].gene[rand_gene_2] = next_population[i].gene[rand_gene_2];
+
+            next_population[i].gene[rand_gene_1] = temporary[i].gene[rand_gene_2]; // swap the genes around
+            next_population[i].gene[rand_gene_2] = temporary[i].gene[rand_gene_1];
+            //printf("\n\tmutated chromosome %d: genes %d and %d",i,rand_gene_1+1,rand_gene_2+1);
+        }
+    }
+    if(mutation_detected==1)//if mutation occurs
+    {
+        for(i=1; i<pop_size+1; i++)
+        {
+            //printf("\n\tchromosome[%d] = ",i);//print out new chromosome order
+            for(j=0; j<chrom_size; j++)
+            {
+                //printf("%d",next_population[i].gene[j]);
+            }
+
+            next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+            //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+        }
+    }
+    else
+        printf(" N/A");
+
+        return(0);
+}
+
+void *crossover_singlepoint(chrom next_population[],int pop_size,int chrom_size,edge edge_energy[])//commented
+{
+    int crossover_point,i,j;
+    chrom temporary[pop_size];
+
+    //printf("\n\n\tSingle point crossover:");
+
+    crossover_point = generate_rand(1,chrom_size-1);//create random cross over point between 1 and the number of bits-1
+    //printf("\n\tcrossing point:%d",crossover_point+1);
+    for(j=1; j<pop_size+1; j+=2) //each parent
+    {
+        for(i=0; i<crossover_point; i++) //
+        {
+            temporary[j+1].gene[i]=next_population[j+1].gene[i];//  child cross over
+            temporary[j].gene[i]=next_population[j].gene[i];   //  child cross over
+        }
+        for(i=crossover_point; i<chrom_size; i++) // crossing the bits beyond the cross point index
+        {
+            temporary[j].gene[i]=next_population[j+1].gene[i];//  child cross over
+            temporary[j+1].gene[i]=next_population[j].gene[i];//  child cross over
+        }
+    }
+    for(i=1; i<pop_size+1; i++)
+    {
+        next_population[i] = temporary[i];
+        //printf("\n\tchromosome[%d] = ",i);//print out new chromosome order
+        for(j=0; j<chrom_size; j++)
+        {
+            //printf("%d",next_population[i].gene[j]);
+        }
+
+        next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+        //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+    }
+
+    return(0);
+}
+
+void *crossover_doublepoint(chrom next_population[],int pop_size,int chrom_size,edge edge_energy[])
+{
+    int i,j;
+    int chromosome_middle;
+    int point_1,point_2;
+    chrom temporary[pop_size];
+
+    //printf("\n\n\tDouble point crossover:");
+    chromosome_middle = (chrom_size-2)/2;
+
+    point_1 = generate_rand(1,chromosome_middle);//create random cross over point between bit 1 and the middle of the chromosome
+    point_2 = generate_rand(chromosome_middle+1,chrom_size-2);//create random cross over point between the middle of the chromosome and chromosome size-1
+    //printf("\n\tcrossing point:%d point %d",point_1+1, point_2+1);//print crossing points
+
+    for(j=1; j<pop_size+1; j+=2) //each parent
+    {
+        temporary[j] = next_population[j];
+        temporary[j+1] = next_population[j+1];
+        for(i=point_1; i<point_2+1; i++) // crossing the bits between crossing point 1 and 2
+        {
+            temporary[j].gene[i]=next_population[j+1].gene[i];//  child cross over
+            temporary[j+1].gene[i]=next_population[j].gene[i];//  child cross over
+        }
+    }
+    for(i=1; i<pop_size+1; i++)
+    {
+        next_population[i] = temporary[i];
+        //printf("\n\tchromosome[%d] = ",i);//print out new chromosome order
+        for(j=0; j<chrom_size; j++)
+        {
+            //printf("%d",next_population[i].gene[j]);
+        }
+
+        next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+        //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+    }
+
+    return(0);
+}
+
+void *crossover_halfuniform(chrom next_population[],int pop_size,int chrom_size,edge edge_energy[])
+{
+    int i,j;
+    int k=1;
+    int non_match;
+    chrom temporary[pop_size];
+
+    //printf("\n\n\tHalf uniform crossover:\n");
+
+    for(i=1; i<pop_size+1; i+=2) //each parent
+    {
+        non_match=0;
+        k = 1;
+        temporary[i] = next_population[i]; //store the population
+        temporary[i+1] = next_population[i+1];
+        for(j=0; j<chrom_size; j++) //see how many nonmatching genes there are btw the parents
+        {
+            if(next_population[i].gene[j] != next_population[i+1].gene[j])// check if their chromosomes match
+                non_match +=1;//count how many genes of the parents dont match
+        }
+        //printf("\tno. of nonmatches:%d in chrom [%d]and[%d]\n",non_match,i,i+1);
+        if(non_match%2 !=0)// if you cant divide the no. of non matching bits
+        {
+            non_match = non_match +1 ; //round up
+        }
+        for(j=0; j<chrom_size; j++) //each gene
+        {
+            if((next_population[i].gene[j] != next_population[i+1].gene[j]) && !(k>(non_match/2)))//each non matching gene
+            {
+                temporary[i+1].gene[j]=next_population[i].gene[j];//  child cross over
+                temporary[i].gene[j]=next_population[i+1].gene[j];   //  child cross over
+                //printf("\tchrom [%d][%d] gene %d\n",i,i+1,j+1);
+                k++;
+            }
+        }
+    }
+    for(i=1; i<pop_size+1; i++)
+    {
+        next_population[i] = temporary[i];
+        //printf("\n\tchromosome[%d] = ",i);//print out new chromosome order
+        for(j=0; j<chrom_size; j++)
+        {
+            //printf("%d",next_population[i].gene[j]);
+        }
+
+        next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+        //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+    }
+    return(0);
+}
+
+void *crossover_uniform(chrom next_population[],int pop_size,int chrom_size,edge edge_energy[])
+{
+    int i,j;
+    int random;
+    int rand_gene;
+    chrom temporary[pop_size];
+
+    //printf("\n\n\tUniform crossover:\n");
+    random = generate_rand(0,chrom_size-1);//create random mixing ratio between 0 and the number of bits-1: this is the number of genes that will be exchanged
+    for(j=1; j<pop_size+1; j+=2) //each parent
+    {
+        temporary[j] = next_population[j];
+        temporary[j+1] = next_population[j+1];
+        for(i=0; i<random; i++) //exchange the genes randomly according to the mixing ratio
+        {
+            rand_gene = generate_rand(0,chrom_size-1); //selects which genes will be exchanged
+
+            temporary[j+1].gene[rand_gene]=next_population[j].gene[rand_gene];//  child cross over
+            temporary[j].gene[rand_gene]=next_population[j+1].gene[rand_gene];   //  child cross over
+            //printf("\tchromosome[%d] and [%d] gene:%d\n",j,j+1,rand_gene+1);
+        }
+    }
+    for(i=1; i<pop_size+1; i++)
+    {
+        next_population[i] = temporary[i];
+        //printf("\n\tchromosome[%d] = ",i);//print out new chromosome order
+        for(j=0; j<chrom_size; j++)
+        {
+            //printf("%d",next_population[i].gene[j]);
+        }
+
+        next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+        //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+    }
+    return(0);
+}
+
+void *selection_elitism_sort(int pop_size,chrom next_population[], int chrom_size,int show,edge edge_energy[])//commented
+{
+    //descending order
+    // population is sorted according to their fitness such that there is no way that strong and weak chromosomes reproduce.
+    int i,j;
+    chrom temporary;
+
+    if (show==1)
+        //printf("\n\n\tElitism (sorting) selection:");
+
+        for(i=1; i<pop_size+1; i++)
+        {
+            for(j=1; j<pop_size; j++) //dont include last chromosome as it has nothing to compare with
+            {
+                if(next_population[j+1].fitness_score > next_population[j].fitness_score) // if the next chromosome is better than the previous (maximizing)
+                {
+                    temporary = next_population[j+1]; // store the chromosome
+                    next_population[j+1] = next_population[j]; // then switch them around such that chromosomes are ordered from best to worst
+                    next_population[j] = temporary;
+                }
+            }
+        }
+    //printf("\n\n\tDescending order of fitness:");
+    for(i=1; i<pop_size+1; i++)
+    {
+        //printf("\n\tchromosome[%d] = ",i);//print out new chromosome order
+        for(j=0; j<chrom_size; j++)
+        {
+            //printf("%d",next_population[i].gene[j]);
+        }
+
+        next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+        //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+    }
+    fflush(NULL);
+    return(0);
+}
+
+void *selection_tournament(int pop_size,chrom next_population[], int chrom_size,edge edge_energy[])//commented
+{
+    int i,j;
+    int rand1_individual,rand2_individual;
+    int rand_r, tournament_size= 8;
+    chrom temporary[pop_size];
+
+    //printf("\n\n\tTournament selection:");
+
+    for(i=1; i<pop_size+1; i++)
+    {
+        rand1_individual = generate_rand(1,pop_size);//get random individuals
+        rand2_individual = generate_rand(1,pop_size);//get random individuals
+
+        rand_r = generate_rand(0,10);//get random number r
+        if(rand_r<tournament_size) // if r is less than the predetermined tournament size thatn select the fittest individula
+        {
+            if(next_population[rand1_individual].fitness_score > next_population[rand2_individual].fitness_score) // store the fittest individual
+                temporary[i]=next_population[rand1_individual];
+            else
+                temporary[i]=next_population[rand2_individual];
+        }
+        else
+        {
+            if(next_population[rand1_individual].fitness_score < next_population[rand2_individual].fitness_score) // store the fittest individual
+                temporary[i]=next_population[rand1_individual];
+            else
+                temporary[i]=next_population[rand2_individual];
+        }
+    }
+    for(i=1; i<pop_size+1; i++)
+    {
+        next_population[i] = temporary[i];
+        //printf("\n\tchromosome[%d] = ",i);//print out new chromosome order
+        for(j=0; j<chrom_size; j++)
+        {
+            //printf("%d",next_population[i].gene[j]);
+        }
+
+        next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+        //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+    }
+    fflush(NULL);
+    return(0);
+}
+
+void *selection_rank(int pop_size,chrom next_population[], int chrom_size,edge edge_energy[])//commented
+{
+    int i,j,k;
+    int show=0;
+    float likelihood;
+    float total=0, rand_number;
+    chrom temporary[pop_size];
+
+    //printf("\n\n\tRank selection:");
+    selection_elitism_sort(pop_size,next_population,chrom_size,show,edge_energy);
+
+    for (i=1; i<pop_size+1; i++)
+        temporary[i] = next_population[i];
+
+    for(i=1; i<pop_size+1; i++) // create new population
+    {
+        k=0;
+        rand_number = generate_rand(0,100);// get random number
+        likelihood = 100.0/(pop_size); // generate probability of each chromosomes occuring
+        do
+        {
+            k++;
+            total = total + likelihood*k;
+        }
+        while (total < rand_number);
+        temporary[i]=next_population[k];
+    }
+    //printf("\n\n\tNew population:");
+    for(i=1; i<pop_size+1; i++) //print out new chromosome
+    {
+        next_population[i] = temporary[i];
+        //printf("\n\tchromosome[%d] = ",i);
+        for(j=0; j<chrom_size; j++)
+        {
+            //printf("%d",next_population[i].gene[j]);
+        }
+        next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+        //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+    }
+    fflush(NULL);
+    return(0);
+}
+
+void *selection_roulettewheel(int pop_size,chrom next_population[], int chrom_size,edge edge_energy[])
+{
+    int i,j;
+    float r_random;
+    float likelihood[pop_size],sum_likelihood[pop_size+1];
+    float total_fitness=0.0;
+    chrom temporary[pop_size];
+
+    sum_likelihood[0]=0.0;
+    //printf("\n\n\tRoulette wheel selection:");
+
+    for(i=1; i<pop_size+1; i++) // calculate total fitness of population
+    {
+        total_fitness +=  next_population[i].fitness_score;//calculate total fitness of the population
+    }
+    for(j=1; j<pop_size+1; j++) // for each chromosome
+    {
+        likelihood[j] = (next_population[j].fitness_score/total_fitness); // calculate the prob of each chromosome
+        sum_likelihood[j] = sum_likelihood[j-1] + likelihood[j];// calculate the total prob of each chromosome
+        //printf("\n\tlikelihood %.2f",likelihood[j]);
+        //printf("\tsum of likelihood %.2f",sum_likelihood[j]);
+    }
+
+    for(j=1; j<pop_size+1; j++)
+        for(i=1; i<pop_size+1; i++)
+        {
+            //printf("\n\trandom %.2f and sumlikeli[%d] %.2f",r_random,i,sum_likelihood[i]);
+            r_random =generate_rand_float();
+            if ((r_random> sum_likelihood[i]) && (likelihood[i]<likelihood[i+1]));
+            temporary[i]=next_population[i];
+        }
+    for(i=1; i<pop_size+1; i++) //print out new chromosome
+    {
+        next_population[i] = temporary[i];
+        //printf("\n\tchromosome[%d] = ",i);
+        for(j=0; j<chrom_size; j++)
+        {
+            //printf("%d",next_population[i].gene[j]);
+        }
+        next_population[i].fitness_score = Objective_function(next_population[i],chrom_size,edge_energy); //fitness score of chromosome
+        //printf(" fitness=%f",next_population[i].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+    }
+    fflush(NULL);
+    return(0);
+}
+
+void *do_mutation_operator(int mutation,chrom next_population[],int chrom_size, int pop_size, float mutation_rate,edge edge_energy[])
+{
+    switch (mutation)
+    {
+    case 1 :
+        mutation_bitstring(chrom_size, pop_size, next_population, mutation_rate,edge_energy);
+        break;
+    case 2 :
+        mutation_bitflip(chrom_size, pop_size, next_population, mutation_rate,edge_energy);
+        break;
+    case 3 :
+        mutation_orderchanging(chrom_size, pop_size, next_population, mutation_rate,edge_energy);
+        break;
+    default :
+        //printf("invalid input\n" );
+        break;
+    }
+    return 0;
+}
+
+void *do_crossover_operator(int crossover,chrom next_population[],int chrom_size, int pop_size,edge edge_energy[])
+{
+    switch (crossover)
+    {
+    case 1 :
+        crossover_singlepoint(next_population,pop_size,chrom_size,edge_energy);
+        break;
+    case 2 :
+        crossover_doublepoint(next_population, pop_size, chrom_size,edge_energy);
+        break;
+    case 3 :
+        crossover_uniform(next_population,pop_size,chrom_size,edge_energy);
+        break;
+    case 4 :
+        crossover_halfuniform(next_population, pop_size, chrom_size,edge_energy);
+        break;
+    default :
+        printf("invalid input\n" );
+        break;
+    }
+    return 0;
+}
+
+void *do_selection_operator(int selection,chrom next_population[],int chrom_size, int pop_size,edge edge_energy[])
+{
+    int show=1;
+    switch (selection)
+    {
+    case 1 :
+        selection_elitism_sort( pop_size,next_population,chrom_size,show,edge_energy);
+        break;
+    case 2 :
+        selection_tournament(pop_size,next_population,chrom_size,edge_energy);
+        break;
+    case 3 :
+        selection_rank(pop_size,next_population,chrom_size,edge_energy);
+        break;
+    case 4 :
+        selection_roulettewheel(pop_size,next_population, chrom_size,edge_energy);
+        break;
+    default :
+        printf("invalid input\n" );
+        break;
+    }
+    return 0;
+}
+
+void *binary_population(chrom current_population[],int pop_size, int chrom_size)
+{
+    // create population
+    int j,i;
+    int random;
+
+    for(j=1; j<pop_size+1; j++) // for each chromosome
+    {
+        for (i=0 ; i<chrom_size; i++) //create each gene
+        {
+            random = (rand()%2); // creating random value (0 or 1)
+            current_population[j].gene[i]=random;  // initialising the gene[i] of chrom[j] with random
+        }
+    }
+    return(0);
+}
+
+void *item_data(int chrom_size, edge edge_energy[])
+{
+    int i, distance;
+    //ask for the distance needed of each edge the node takes and store them
+    printf("\nEnter the network topology matrix:\n");
+    for(i=1; i<=chrom_size; i++)
+        {
+            scanf("%d",&distance);
+            edge_energy[i].weight=pow(distance,2);
+            if(edge_energy[i].weight==0)
+                edge_energy[i].weight=MAX_TX_DISTANCE;//set non-existing edges to a large number (infinity) to prevent being selected
+        }
+
+//    edge_energy[0].distance = 29;
+//    edge_energy[1].distance = 10;
+//    edge_energy[2].distance = 11;
+//    edge_energy[3].distance = 6;
+//    edge_energy[4].distance = 4;
+//    edge_energy[5].distance = 15;
+//    edge_energy[6].distance = 36;
+//    edge_energy[7].distance = 22;
+//    edge_energy[8].distance = 8;
+//    edge_energy[9].distance = 19;
+//    edge_energy[10].distance = 10;
+//    edge_energy[11].distance = 12;
+//    edge_energy[12].distance = 21;
+//    edge_energy[13].distance = 14;
+//    edge_energy[14].distance = 7;
+//    edge_energy[15].distance = 3;
+//    edge_energy[16].distance = 46;
+//    edge_energy[17].distance = 27;
+//    edge_energy[18].distance = 56;
+//    edge_energy[19].distance = 19;
+//    edge_energy[20].distance = 20;
+//    edge_energy[21].distance = 21;
+//    edge_energy[22].distance = 42;
+//    edge_energy[23].distance = 43;
+//    edge_energy[24].distance = 36;
+//    edge_energy[25].distance = 25;
+//    edge_energy[26].distance = 22;
+//    edge_energy[27].distance = 27;
+//    edge_energy[28].distance = 44;
+//    edge_energy[29].distance = 39;
+//    edge_energy[30].distance = 30;
+//    edge_energy[31].distance = 51;
+//    edge_energy[32].distance = 32;
+//    edge_energy[33].distance = 33;
+//    edge_energy[34].distance = 34;
+
+    return(0);
+}
+
+float Objective_function(chrom next_population, int chrom_size,edge edge_energy[])
+{
+
+    float sum_energy=0.0;
+   // float function_value;
+
+    sum_energy = total_energy(next_population,chrom_size,edge_energy);
+ //   if ()//it does not include all nodes set to 0
+
+ //minimise the function
+
+    return(sum_energy);
+}
+
+float total_energy(chrom next_population, int chrom_size,edge edge_energy[])
+{
+    int i;
+    float sum_energy=0.0;
+
+    for(i=0; i<chrom_size; i++)
+    {
+        if(next_population.gene[i]==1)
+        {
+            sum_energy = (sum_energy + edge_energy[i].weight);//total energy of all items chosen
+        }
+    }
+    return sum_energy;
+}
+
+int generate_rand(int Min, int Max)
+{
+    // Generates random number between min and max, inclusive.
+    //From: http://cboard.cprogramming.com/c-programming/145187-how-pick-random-number-between-x-y.html
+
+    int range, result, cutoff;
+
+    if (Min >= Max)
+        return Min; // only one outcome possible, or invalid parameters
+    range = Max-Min+1;
+    cutoff = (RAND_MAX / range) * range;
+
+    // Rejection method, to be statistically unbiased.
+    do
+    {
+        result = rand();
+    }
+    while (result >= cutoff);
+
+    return result % range + Min;
+}
+
+float generate_rand_float(void)
+{
+    float random_value; // random value betw
+
+    random_value = ((float)rand()/(float)(RAND_MAX+1));//version 1
+    //Alternatively:
+    //random_value = ((rand()%10000000)/10000000);
+
+    return random_value;
+}
+
+int get_restart(void)
+{
+    int restart; //number of chromosomes entered
+
+    printf("\n\n\n\n\tWould you like to restart? (1 = yes)\t");// ask if they want to restart
+    scanf("%d",&restart);
+
+    return restart;
+}
+
+float get_mutation_rate(void)
+{
+    float mutation_rate; //number of chromosomes entered
+
+enter:
+    printf("Please enter (float) mutation rate (Minimum %d to Maximum %d):\t",MIN_MUTATION_RATE,MAX_MUTATION_RATE);// Ask for number of chromosomes
+    scanf("%f",&mutation_rate); //get the number of chromosomes
+
+    if(mutation_rate <MIN_MUTATION_RATE || mutation_rate>MAX_MUTATION_RATE)
+        goto enter;
+
+    return mutation_rate;
+}
+
+int get_chromosome_size(void)
+{
+    int chrom_size; //problem size
+
+enter:
+    printf("Please enter an even no. of Edges considered (Min %d to Max %d):\t",MIN_CHROMO_SIZE,MAX_CHROMO_SIZE);// Ask for number of chromosomes
+    scanf("%d",&chrom_size); //get the number of chromosomes
+
+
+    if(chrom_size <MIN_CHROMO_SIZE || chrom_size>MAX_CHROMO_SIZE)
+        goto enter;
+    if(chrom_size%2 !=0)
+        goto enter;
+    return (chrom_size);
+}
+
+int get_population_size(void)
+{
+    int pop_size; //number of population entered
+
+enter:
+    printf("Please enter an even population size (Minimum %d to Maximum of %d):\t",MIN_POP_SIZE,MAX_POP_SIZE);// Ask for number of population
+    scanf("%d",&pop_size); //get the number of population
+
+    if(pop_size <MIN_POP_SIZE || pop_size>MAX_POP_SIZE)
+        goto enter;
+    else if(pop_size%2 !=0)
+        goto enter;
+
+    return pop_size;
+}
+
+int get_mutation_strategy(void)
+{
+    int mutation; //number of population entered
+
+enter:
+    printf("\n\tChoose a mutation strategy: \
+                 \n\t\tBit string       \t 1       \
+                 \n\t\tBit flip         \t 2       \
+                 \n\t\tOrder changing   \t 3       \
+                 \n\t\tYou picked:");// Ask for mutation strategy
+
+    scanf("%d",&mutation); //get the number of population
+
+    if(mutation <1 || mutation>3)
+        goto enter;
+    return mutation;
+}
+
+int get_crossover_strategy(void)
+{
+    int crossover; //number of population entered
+
+enter:
+    printf("\n\tChoose a crossover strategy: \
+                 \n\t\tSingle point    \t 1       \
+                 \n\t\tDouble point    \t 2       \
+                 \n\t\tUniform         \t 3       \
+                 \n\t\tHalf uniform    \t 4       \
+                 \n\t\tYou picked:");// Ask for crossover strategy
+
+    scanf("%d",&crossover); //get the number of population
+
+    if(crossover <1 || crossover>4)
+        goto enter;
+    return crossover;
+}
+
+int get_selection_strategy(void)
+{
+    int selection; //number of population entered
+
+enter:
+    printf("\n\tChoose a selection strategy: \
+                 \n\t\tElitism         \t 1       \
+                 \n\t\tTournament      \t 2       \
+                 \n\t\tRank            \t 3       \
+                 \n\t\tRoulette Wheel  \t 4       \
+                 \n\t\tYou picked:");// Ask for selection strategy
+
+    scanf("%d",&selection); //get the number of population
+
+    if(selection <1 || selection>4)
+        goto enter;
+    return selection;
+}
+
+int get_num_generation(void)
+{
+    int num; //number of generations entered
+
+enter:
+    printf("Please enter the number of generations (Minimum 1 to Maximum of %d):\t",MAX_GENERATIONS);// Ask for number of generation for stopping criterion
+    scanf("%d",&num); //get the number of generations
+
+    if(num < 1 || num > MAX_GENERATIONS)
+        goto enter;
+    return num;
+}
+
+void intro_objective_function (void)
+{
+    printf("\n\n\n\n\n\nWelcome to the Genetic Algorithm coded by Daniella Bacud\n"); // Print introduction
+}
+
