@@ -12,6 +12,10 @@
 //
 //loops --> exist if they have the same ancestor
 //change weight to distance to power **do it in cost function
+//make sure when you remove an edge, all nodes are still in the tree
+        //remove before you add => no loops
+        //only the nodes which have more than 1 connected edges can be removed
+        //check this!!
 typedef struct Edge
 {
     int weight;//distance
@@ -93,6 +97,8 @@ int main()
     //set other variables
     int rand;
     int n,m,x,y,i=1,j;
+    int iteration =1;
+    int node1_connect=0,node2_connect=0;
     int edgeRemoved = FALSE, edgeAdded = FALSE;
 
 
@@ -111,7 +117,7 @@ int main()
 
     visited[1]=1;//set node one as the source node
 
-    //generate initial random solution (TREE MST)
+    //generate initial random solution (TREE MST - no loops)
     while(num_edges < num_nodes)//have required #edges = #node-1
 	{
         for(x=1; x<=num_nodes; x++)
@@ -125,7 +131,7 @@ int main()
                         if (rand == 1)
                         {
                             visited [y] = 1;
-                            printf("\n Edge1 %d:(%d %d) energy:%d",num_edges++,x,y,initial_SA[x][y].weight);
+                            printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,initial_SA[x][y].weight);
                             for(n=1; n<=num_nodes; n++)
                                 if(n!=y)//find different edge connected to node x
                                     if (initial_SA[x][n].weight != 0)//if edge is possible
@@ -133,7 +139,7 @@ int main()
                                         {
                                             visited[n]=1;
                                             initial_SA[x][n].label = 1;
-                                            printf("\n Edge2 %d:(%d %d) energy:%d",num_edges++,x,n,initial_SA[x][n].weight);
+                                            printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,n,initial_SA[x][n].weight);
                                             temp[x][n].weight=0; //as edge is has lower energy, the weight is not needed
                                             initial_SA[x][n].weight=initial_SA[n][x].weight=0;//make sure same edge is not chosen twice
                                         }
@@ -166,56 +172,87 @@ int main()
                     weight = current_SA[x][y].weight;
         old_cost += weight;//find total weight
     }
-    printf("\n First iteration cost = %d",old_cost);
 
-//    while (T > T_min)//max generation
-//        {
-//            while (i <= 100)//"process is carried about many times (typically somewhere between 100 and 1,000) at each temperature"
-                //by http://katrinaeg.com/simulated-annealing.html
-//            {
-//                //neighbour function
-//                for(x=1; x<=num_nodes; x++)//store previous solution into new solution
-//                    for(y=1; y<=num_nodes; y++)
-//                        new_solution[x][y] = current_SA[x][y];
-//
-//                while (edgeRemoved == FALSE)
-//                {
-//                    n = rand_btw(1,num_nodes);
-//                    m = rand_btw(1,num_nodes);
-//
-//                    while(new_solution[n][m].weight==0)
-//                    {
-//                        n = rand_btw(1,num_nodes);
-//                        m = rand_btw(1,num_nodes);
-//                    }
-//                    if(new_solution[n][m].label == 1)
-//                    {
-//                        new_solution[n][m].label = 0;
-//                        edgeRemoved = TRUE;
-//                    }
-//                }
-//                while (edgeAdded == FALSE)
-//                {
-//                    n = rand_btw(1,num_nodes);
-//                    m = rand_btw(1,num_nodes);
-//
-//                    while(new_solution[n][m].weight==0)
-//                    {
-//                        n = rand_btw(1,num_nodes);
-//                        m = rand_btw(1,num_nodes);
-//                    }
-//                    if(new_solution[n][m].label == 0)
-//                    {
-//                        new_solution[n][m].label = 1;
-//                        edgeAdded = TRUE;
-//                    }
-//                }
-//
-//                //cost function for the new_solution
+    printf("\n First iteration cost = %d\n",old_cost);
+
+    //main algorithm
+    T=0;
+    while (T <=3)//max generation //CHANGE THIS BACK TO T<=T_min
+        {
+            printf("\n\nIteration: %d",iteration++);
+            i = 1;//reset counter for neighbor-cost-compare-move process
+            //CHANGE BACK TO i<=100
+            while (i <= 2)//"neighbor-cost-compare-move process
+                //process is carried about many times (typically somewhere between 100 and 1,000) at each temperature"
+                //by http:katrinaeg.com/simulated-annealing.html
+            {
+                printf("\n\nNeighbor-cost-compare-move iteration: %d",i);
+
+                //neighbour function
+                //temperature decreases by a factor of alpha after each generation until the minimum temp is reached
+                for(x=1; x<=num_nodes; x++)
+                    for(y=1; y<=num_nodes; y++)
+                        new_solution[x][y] = current_SA[x][y];
+                
+                while (edgeRemoved == FALSE)//remove a random edge
+                {
+                    n = rand_btw(1,num_nodes);//select two random nodes
+                    m = rand_btw(1,num_nodes);
+                    
+                    while(new_solution[n][m].label ==0)//make sure that the edge is in the current solution.
+                        //while edge is not in solution, find another edge until solution edge is found
+                        //Note, if edge is in current solution then edge is also possible
+                    {
+                        n = rand_btw(1,num_nodes);
+                        m = rand_btw(1,num_nodes);
+                        
+                        //make sure that the two nodes have at least 2 edges connected to it --> doesn't break the tree when removed
+                        for(y=1; y<=num_nodes; y++)
+                            if (new_solution[n][y].label==1);
+                                node1_connect += 1;
+                        for(y=1; y<=num_nodes; y++)
+                            if (new_solution[m][y].label==1);
+                                node2_connect += 1;
+                        while(node1_connect !>=2 && node2_connect !>=2)
+                        {
+                            n = rand_btw(1,num_nodes);
+                            m = rand_btw(1,num_nodes);
+                        }
+                    }
+                    printf("\nRemove Edge (%d %d)",n,m);
+                    new_solution[n][m].label = 0;//remove this random edge
+                    edgeRemoved = TRUE;
+                }
+                
+                while (edgeAdded == FALSE)//add a random edge
+                {
+                    n = rand_btw(1,num_nodes);//select two random nodes
+                    m = rand_btw(1,num_nodes);
+
+                    while(new_solution[n][m].label ==1)//while edge is in the current solution, find another edge until a non-solution edge that is achievable is found
+                    {
+                        n = rand_btw(1,num_nodes);
+                        m = rand_btw(1,num_nodes);
+                        while(new_solution[n][m].weight ==0)//while edge is not possible, find another edge until a possible edge is found
+                        {
+                            n = rand_btw(1,num_nodes);
+                            m = rand_btw(1,num_nodes);
+                        }
+                    }
+                    printf("\nAdd Edge (%d %d)",n,m);
+                    new_solution[n][m].label = 1;
+                    edgeAdded = TRUE;
+                }
+//                //cost function
 //                for(x=1; x<=num_nodes; x++)
+//                {
+//                    weight =0;
 //                    for(y=1; y<=num_nodes; y++)
-//                        if(new_solution[x][y].label ==1)
-//                            new_cost += new_solution[x][y].weight;
+//                        if(new_solution[x][y].label ==1)//check if edge is in the solution
+//                            if(weight<new_solution[x][y].weight)//find highest energy used per node
+//                                weight = new_solution[x][y].weight;
+//                    new_cost += weight;//find total weight
+//                }
 //
 //                //acceptance probability function
 //                delta = (old_cost-new_cost);
@@ -238,19 +275,22 @@ int main()
 //                        old_cost = new_cost;
 //                    }
 //                }
-//
-//                i += 1;
-//                edgeAdded = FALSE;
-//                edgeRemoved = FALSE;
-//            }
-//            T = T*alpha;
-//        }
 
-    printf("\nSolution is");
+                i += 1;
+                edgeAdded = FALSE;//reset value
+                edgeRemoved = FALSE;//reset value
+            }
+            //temperature decreases by a factor of alpha after each generation until the minimum temp is reached
+            //T = T*alpha;
+            //CHANGE T + T*ALPHA BACK
+            T++;//
+        }
+
+    printf("\n\n\n\nSolution is");
     for(x=1; x<=num_nodes; x++)
         for(y=1; y<=num_nodes; y++)
            printf("%d",current_SA[x][y].label);
 
-    printf("\nTotal cost is %d", old_cost);
+    printf("\nTotal cost is %d\n\n", old_cost);
     return 0;
 }
