@@ -9,6 +9,9 @@
 
 //each bit of the solution is an edge
 // number of edges = number of nodes squared
+//
+//loops --> exist if they have the same ancestor
+//change weight to distance to power **do it in cost function
 typedef struct Edge
 {
     int weight;//distance
@@ -72,61 +75,68 @@ int get_num_nodes(void)
 
 int main()
 {
-//    initialise data
-    double T = 1.0;
-    double T_min = 0.00001;
-    double alpha = 0.9;
+    //initialise data
+    double T = 1.0;//"Usually, the temperature is started at 1.0 and is decreased at the end of each iteration by multiplying it by a constant called α" 7
+    //by http://katrinaeg.com/simulated-annealing.html
+    //typical choices are between 0.8 and 0.99.
+    double T_min = 0.00001; //min temp to be reached
+    double alpha = 0.9;//depreciation constant used for temperature after each iteration
     double ap=0.0;
-    int n,m,x,y,i=1,j;
     int delta=0;
 
-    int num_nodes =0;
-    int rand;
-    int old_cost=0,new_cost=0;
-    int edgeRemoved = FALSE, edgeAdded = FALSE;
-    int visited [400]={0};//set all nodes
+    //set default setting
     int num_edges=1;
+    int old_cost=0,new_cost=0;
+    int num_nodes =0, weight =0;
+    int visited [400]={0};//set all nodes
+
+    //set other variables
+    int rand;
+    int n,m,x,y,i=1,j;
+    int edgeRemoved = FALSE, edgeAdded = FALSE;
+
 
     num_nodes = get_num_nodes();
     edge initial_SA[10][10];
     edge current_SA[10][10];
     edge new_solution[10][10];
     edge temp[10][10];
+    edge energy[10][10];
 
-
-//    ask for the energy needed of each edge the node takes and store them
+    //ask for the energy needed of each edge the node takes and store them
     printf("\nEnter the network topology matrix:\n");
     for(x=1; x<=num_nodes; x++)
         for(y=1; y<=num_nodes; y++)
-        {
             scanf("%d",&initial_SA[x][y].weight);
-        }
-    visited[1]=1;
+
+    visited[1]=1;//set node one as the source node
+
+    //generate initial random solution (TREE MST)
     while(num_edges < num_nodes)//have required #edges = #node-1
-    {
+	{
         for(x=1; x<=num_nodes; x++)
             for(y=1; y<=num_nodes; y++)//for all edges
-            {
                 if(visited[x]!=0)//if node is visited
                 {
                     if(initial_SA[x][y].weight!=0) //if edge is possible
                     {
                         rand = rand_binary();
                         initial_SA[x][y].label=rand;//randomly add an edge
-                        if (initial_SA[x][y].label == 1)
+                        if (rand == 1)
                         {
                             visited [y] = 1;
-                            printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,initial_SA[x][y].weight);
+                            printf("\n Edge1 %d:(%d %d) energy:%d",num_edges++,x,y,initial_SA[x][y].weight);
                             for(n=1; n<=num_nodes; n++)
-                                if(n!=y)
-                                    if(initial_SA[x][n].weight<= initial_SA[y][x].weight)// node can reach all other nodes with equal or lower tx power
-                                    {
-                                        visited[n]=1;
-                                        initial_SA[x][n].label == 1;
-                                        printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,n,initial_SA[y][x].weight);
-                                        temp[x][n].weight=initial_SA[x][n].weight; //store value of weight
-                                        initial_SA[x][y].weight=initial_SA[y][x].weight=0;//make sure same edge is not chosen twice
-                                    }
+                                if(n!=y)//find different edge connected to node x
+                                    if (initial_SA[x][n].weight != 0)//if edge is possible
+                                        if(initial_SA[x][n].weight<= initial_SA[x][y].weight)// node can reach all other nodes with equal or lower tx power
+                                        {
+                                            visited[n]=1;
+                                            initial_SA[x][n].label = 1;
+                                            printf("\n Edge2 %d:(%d %d) energy:%d",num_edges++,x,n,initial_SA[x][n].weight);
+                                            temp[x][n].weight=0; //as edge is has lower energy, the weight is not needed
+                                            initial_SA[x][n].weight=initial_SA[n][x].weight=0;//make sure same edge is not chosen twice
+                                        }
                             temp[x][y].weight=initial_SA[x][y].weight; //store value of weight
                             initial_SA[x][y].weight=initial_SA[y][x].weight=0;//make sure same edge is not chosen twice
                         }
@@ -134,36 +144,53 @@ int main()
                     else
                         initial_SA[x][y].label=0;//if edge is not possible don't pick
                 }
-            }
+
+	}
+	//transfer original weight back
+    for(x=1; x<=num_nodes; x++)
+        for(y=1; y<=num_nodes; y++)
+            initial_SA[x][y].weight = temp[x][y].weight;
+
+    //set current solution to the initial solution generated
+    for(x=1; x<=num_nodes; x++)
+        for(y=1; y<=num_nodes; y++)
+            current_SA[x][y] = initial_SA[x][y];
+
+    //cost function
+    for(x=1; x<=num_nodes; x++)
+    {
+        weight =0;
+        for(y=1; y<=num_nodes; y++)
+            if(current_SA[x][y].label ==1)//check if edge is in the solution
+                if(weight<current_SA[x][y].weight)//find highest energy used per node
+                    weight = current_SA[x][y].weight;
+        old_cost += weight;//find total weight
     }
-    for(x=1; x<=num_nodes; x++)
-        for(y=1; y<=num_nodes; y++)
-            current_SA[x][y] = temp[x][y];
-//    cost function
-    for(x=1; x<=num_nodes; x++)
-        for(y=1; y<=num_nodes; y++)
-            if(current_SA[x][y].label ==1)
-                old_cost += current_SA[x][y].weight;
-    printf("cost = %d",old_cost);
-//
-//    while (T > T_min)
+    printf("\n First iteration cost = %d",old_cost);
+
+//    while (T > T_min)//max generation
 //        {
-//            while (i <= 100)
+//            while (i <= 100)//"process is carried about many times (typically somewhere between 100 and 1,000) at each temperature"
+                //by http://katrinaeg.com/simulated-annealing.html
 //            {
 //                //neighbour function
+//                for(x=1; x<=num_nodes; x++)//store previous solution into new solution
+//                    for(y=1; y<=num_nodes; y++)
+//                        new_solution[x][y] = current_SA[x][y];
+//
 //                while (edgeRemoved == FALSE)
 //                {
 //                    n = rand_btw(1,num_nodes);
 //                    m = rand_btw(1,num_nodes);
 //
-//                    while(current_SA[n][m].weight==0)
+//                    while(new_solution[n][m].weight==0)
 //                    {
 //                        n = rand_btw(1,num_nodes);
 //                        m = rand_btw(1,num_nodes);
 //                    }
-//                    if(current_SA[n][m].label == 1)
+//                    if(new_solution[n][m].label == 1)
 //                    {
-//                        current_SA[n][m].label = 0;
+//                        new_solution[n][m].label = 0;
 //                        edgeRemoved = TRUE;
 //                    }
 //                }
@@ -172,35 +199,44 @@ int main()
 //                    n = rand_btw(1,num_nodes);
 //                    m = rand_btw(1,num_nodes);
 //
-//                    while(current_SA[n][m].weight==0)
+//                    while(new_solution[n][m].weight==0)
 //                    {
 //                        n = rand_btw(1,num_nodes);
 //                        m = rand_btw(1,num_nodes);
 //                    }
-//                    if(current_SA[n][m].label == 0)
+//                    if(new_solution[n][m].label == 0)
 //                    {
-//                        current_SA[n][m].label = 1;
+//                        new_solution[n][m].label = 1;
 //                        edgeAdded = TRUE;
 //                    }
 //                }
-//                for(x=1; x<=num_nodes; x++)
-//                    for(y=1; y<=num_nodes; y++)
-//                        new_solution[x][y] = current_SA[x][y];
-//                //cost function
+//
+//                //cost function for the new_solution
 //                for(x=1; x<=num_nodes; x++)
 //                    for(y=1; y<=num_nodes; y++)
 //                        if(new_solution[x][y].label ==1)
 //                            new_cost += new_solution[x][y].weight;
+//
 //                //acceptance probability function
 //                delta = (old_cost-new_cost);
-//                ap = (exp(-delta/T));
+//                ap = (exp(-delta/T)); //this is the typical equation used
 //
-//                if (ap > rand_percentage())
+//                if(new_cost < old_cost)//if new_solution has less energy select it
 //                {
-//                     for(x=1; x<=num_nodes; x++)
+//                    for(x=1; x<=num_nodes; x++)
 //                        for(y=1; y<=num_nodes; y++)
 //                            current_SA[x][y] = new_solution[x][y];
 //                    old_cost = new_cost;
+//                }
+//                else //if new_solution uses more energy maybe select it
+//                {
+//                    if (ap > rand_btw(0,1))
+//                    {
+//                        for(x=1; x<=num_nodes; x++)
+//                            for(y=1; y<=num_nodes; y++)
+//                                current_SA[x][y] = new_solution[x][y];
+//                        old_cost = new_cost;
+//                    }
 //                }
 //
 //                i += 1;
@@ -209,12 +245,12 @@ int main()
 //            }
 //            T = T*alpha;
 //        }
-//
-//    printf("\nSolution is");
-//    for(x=1; x<=num_nodes; x++)
-//        for(y=1; y<=num_nodes; y++)
-//           printf("%d",current_SA[x][y].label);
-//
-//    printf("\n Old cost is %d", old_cost);
+
+    printf("\nSolution is");
+    for(x=1; x<=num_nodes; x++)
+        for(y=1; y<=num_nodes; y++)
+           printf("%d",current_SA[x][y].label);
+
+    printf("\nTotal cost is %d", old_cost);
     return 0;
 }
