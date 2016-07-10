@@ -10,20 +10,23 @@
 //each bit of the solution is an edge
 // number of edges = number of nodes squared
 //
-//loops --> exist if they have the same ancestor
+//loops --> exist if they have the same ancestor (Dept first Search)
+        //If an unexplored edge leads to a node visited before, then the graph contains a cycle.
 //change weight to distance to power **do it in cost function
 //make sure when you remove an edge, all nodes are still in the tree
         //remove before you add => no loops
-        //only the nodes which have more than 1 connected edges can be removed
-        //check this!!
+        //only the nodes which have more than 1 connected edges can be removed => no loops
+//make initialisation random
+
 typedef struct Edge
 {
     int weight;//distance
     int label;
+    int calculated;
 }edge;
 
 int rand_binary(void);
-int rand_btw(int Min, int Max);
+int rand_btw(int Min, int Max,int not_including);
 double rand_percentage(void);
 
 int get_num_nodes(void);
@@ -47,13 +50,13 @@ double rand_percentage(void)
     return random_value;
 }
 
-int rand_btw(int Min, int Max)
+int rand_btw(int Min, int Max,int not_including)
 {
 //     Generates random number between min and max, inclusive.
 //    From: http://cboard.cprogramming.com/c-programming/145187-how-pick-random-number-between-x-y.html
 
-    int range, result, cutoff;
-
+    int range, result, cutoff,random;
+    redo:
     if (Min >= Max)
         return Min; // only one outcome possible, or invalid parameters
     range = Max-Min+1;
@@ -65,8 +68,22 @@ int rand_btw(int Min, int Max)
         result = rand();
     }
     while (result >= cutoff);
+    random = result % range + Min;
+    if(not_including !=0 )
+        if(random==not_including)
+            goto redo;
+    return random;
+}
 
-    return result % range + Min;
+void DFS(void)
+{
+    int j,int i=1;
+    printf("\n*****visited: %d",i);
+    visited[i]=1;
+
+    for(j=0;j<n;j++)
+       if(!visited[j]&&G[i][j]==1)
+            DFS(j);
 }
 
 int get_num_nodes(void)
@@ -97,8 +114,8 @@ int main()
     //set other variables
     int rand;
     int n,m,x,y,i=1,j;
+    int a[10]={0},b[10]={0};
     int iteration =1;
-    int node1_connect=0,node2_connect=0;
     int edgeRemoved = FALSE, edgeAdded = FALSE;
 
 
@@ -115,43 +132,50 @@ int main()
         for(y=1; y<=num_nodes; y++)
             scanf("%d",&initial_SA[x][y].weight);
 
+    for(x=1; x<=num_nodes; x++)
+        for(y=1; y<=num_nodes; y++)
+        {
+            temp[x][y].weight = initial_SA[x][y].weight;//store data of weights as initial_SA.weight will be modified temporarily for calculations
+            initial_SA[x][y].label =0;//initially start with no tree
+            initial_SA[x][y].calculated=0;
+        }
+
     visited[1]=1;//set node one as the source node
 
     //generate initial random solution (TREE MST - no loops)
-    while(num_edges < num_nodes)//have required #edges = #node-1
+   while(num_edges < num_nodes)//have required #edges = #node-1
 	{
         for(x=1; x<=num_nodes; x++)
             for(y=1; y<=num_nodes; y++)//for all edges
                 if(visited[x]!=0)//if node is visited
-                {
                     if(initial_SA[x][y].weight!=0) //if edge is possible
-                    {
-                        rand = rand_binary();
-                        initial_SA[x][y].label=rand;//randomly add an edge
-                        if (rand == 1)
-                        {
-                            visited [y] = 1;
-                            printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,initial_SA[x][y].weight);
-                            for(n=1; n<=num_nodes; n++)
-                                if(n!=y)//find different edge connected to node x
-                                    if (initial_SA[x][n].weight != 0)//if edge is possible
-                                        if(initial_SA[x][n].weight<= initial_SA[x][y].weight)// node can reach all other nodes with equal or lower tx power
-                                        {
-                                            visited[n]=1;
-                                            initial_SA[x][n].label = 1;
-                                            printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,n,initial_SA[x][n].weight);
-                                            temp[x][n].weight=0; //as edge is has lower energy, the weight is not needed
-                                            initial_SA[x][n].weight=initial_SA[n][x].weight=0;//make sure same edge is not chosen twice
-                                        }
-                            temp[x][y].weight=initial_SA[x][y].weight; //store value of weight
-                            initial_SA[x][y].weight=initial_SA[y][x].weight=0;//make sure same edge is not chosen twice
-                        }
-                    }
-                    else
-                        initial_SA[x][y].label=0;//if edge is not possible don't pick
-                }
-
+                        if(visited[y]==0)//if node is not yet visited
+						{
+							rand = rand_binary();
+							initial_SA[x][y].label=initial_SA[y][x].label=rand;//randomly add an edge
+							if (rand == 1)
+							{
+								visited [y] = 1;
+								printf("\n Edge1 %d:(%d %d) energy:%d, label:%d",num_edges++,x,y,initial_SA[x][y].weight,initial_SA[x][y].label);
+								for(n=1; n<=num_nodes; n++)
+									if(n!=y)//find different edge connected to node x
+										if (initial_SA[x][n].weight != 0)//if edge is possible
+											if(initial_SA[x][n].weight<= initial_SA[x][y].weight)// node can reach all other nodes with equal or lower tx power
+												if(visited[n]==0)//if node is not yet visited
+												{
+												    visited[n]=1;
+                                                    initial_SA[x][n].label = 1;
+                                                    initial_SA[n][x].label = 1;
+                                                    printf("\n Edge2 %d:(%d %d) energy:%d, label:%d",num_edges++,x,n,initial_SA[x][n].weight,initial_SA[x][n].label);
+                                                    temp[x][n].weight=0; //as edge is has lower energy, the weight is not needed
+                                                    initial_SA[x][n].weight=initial_SA[n][x].weight=0;//make sure same edge is not chosen twice
+												}
+								temp[x][y].weight=initial_SA[x][y].weight; //store value of weight
+								initial_SA[x][y].weight=initial_SA[y][x].weight=0;//make sure same edge is not chosen twice
+							}
+						}
 	}
+
 	//transfer original weight back
     for(x=1; x<=num_nodes; x++)
         for(y=1; y<=num_nodes; y++)
@@ -160,7 +184,19 @@ int main()
     //set current solution to the initial solution generated
     for(x=1; x<=num_nodes; x++)
         for(y=1; y<=num_nodes; y++)
-            current_SA[x][y] = initial_SA[x][y];
+        {
+            current_SA[x][y].weight = initial_SA[x][y].weight;
+            current_SA[x][y].label = initial_SA[x][y].label;
+            current_SA[x][y].calculated = initial_SA[x][y].calculated;
+        }
+
+    printf("\n\n\n\n Initial Solution is");
+    for(x=1; x<=num_nodes; x++)
+    {
+        printf("\n node %d:",x);
+        for(y=1; y<=num_nodes; y++)
+           printf(" %d",current_SA[x][y].label);
+    }
 
     //cost function
     for(x=1; x<=num_nodes; x++)
@@ -168,89 +204,125 @@ int main()
         weight =0;
         for(y=1; y<=num_nodes; y++)
             if(current_SA[x][y].label ==1)//check if edge is in the solution
-                if(weight<current_SA[x][y].weight)//find highest energy used per node
-                    weight = current_SA[x][y].weight;
+            {
+                if(current_SA[x][y].calculated==0)//if not a symmetry edge
+                    if(weight<current_SA[x][y].weight)//find highest energy used per node
+                        weight = current_SA[x][y].weight;
+
+                current_SA[x][y].calculated=1;
+                current_SA[y][x].calculated=1;
+            }
         old_cost += weight;//find total weight
     }
-
     printf("\n First iteration cost = %d\n",old_cost);
 
     //main algorithm
     T=0;
     while (T <=3)//max generation //CHANGE THIS BACK TO T<=T_min
         {
-            printf("\n\nIteration: %d",iteration++);
+            printf("\n\n    Iteration: %d",iteration++);
             i = 1;//reset counter for neighbor-cost-compare-move process
             //CHANGE BACK TO i<=100
             while (i <= 2)//"neighbor-cost-compare-move process
                 //process is carried about many times (typically somewhere between 100 and 1,000) at each temperature"
                 //by http:katrinaeg.com/simulated-annealing.html
             {
-                printf("\n\nNeighbor-cost-compare-move iteration: %d",i);
+                printf("\n\n Neighbor-cost-compare-move iteration: %d",i);
 
                 //neighbour function
                 //temperature decreases by a factor of alpha after each generation until the minimum temp is reached
                 for(x=1; x<=num_nodes; x++)
                     for(y=1; y<=num_nodes; y++)
                         new_solution[x][y] = current_SA[x][y];
-                
+
                 while (edgeRemoved == FALSE)//remove a random edge
                 {
-                    n = rand_btw(1,num_nodes);//select two random nodes
-                    m = rand_btw(1,num_nodes);
-                    
+                    n = rand_btw(1,num_nodes,0);//select two random nodes to remove the edge from
+                    m = rand_btw(1,num_nodes,n);
                     while(new_solution[n][m].label ==0)//make sure that the edge is in the current solution.
                         //while edge is not in solution, find another edge until solution edge is found
-                        //Note, if edge is in current solution then edge is also possible
+                        //Note, if edge is in current solution then edge is also possible i.e. has a weight>0
                     {
-                        n = rand_btw(1,num_nodes);
-                        m = rand_btw(1,num_nodes);
-                        
-                        //make sure that the two nodes have at least 2 edges connected to it --> doesn't break the tree when removed
-                        for(y=1; y<=num_nodes; y++)
-                            if (new_solution[n][y].label==1);
-                                node1_connect += 1;
-                        for(y=1; y<=num_nodes; y++)
-                            if (new_solution[m][y].label==1);
-                                node2_connect += 1;
-                        while(node1_connect !>=2 && node2_connect !>=2)
-                        {
-                            n = rand_btw(1,num_nodes);
-                            m = rand_btw(1,num_nodes);
-                        }
+                        n = rand_btw(1,num_nodes,0);
+                        m = rand_btw(1,num_nodes,n);//prevent picking the same node
                     }
-                    printf("\nRemove Edge (%d %d)",n,m);
-                    new_solution[n][m].label = 0;//remove this random edge
-                    edgeRemoved = TRUE;
+                    printf("\n Remove Edge (%d %d)",n,m);
+                    new_solution[n][m].label =new_solution[m][n].label= 0;//remove this random edge from the solution
+                    edgeRemoved = TRUE;//this separates the tree into two branches
                 }
-                
-                while (edgeAdded == FALSE)//add a random edge
-                {
-                    n = rand_btw(1,num_nodes);//select two random nodes
-                    m = rand_btw(1,num_nodes);
+//                while (edgeAdded==FALSE)//add edge between the two branches to make a complete tree
+//                {
+//                    //find all nodes in branch of node n
+//                    for(x=1; x<=num_nodes; x++)//for node n
+//                       if(new_solution[n][x].label==1)//all nodes connected to node n
+//						{
+//							printf("node n is connected to node: %d",x);
+//							for(y=1; y<=num_nodes; y++)//all other nodes x connected to
+//                                if(new_solution[x][y].label==1)
+//								{
+//									printf("node n is connected to nodes: %d",y);
+//								}
+//                    //find all nodes in branch of node m
+//**********************************************************************************************88
+//
+//
+//                    join a random node
+//                    check if all nodes are visited
+//                    if not join a different node
+//                    //check which node (n or m) is no longer visited
+//                    //i.e. solution x or y is not 1
+////                    for(x=1; x<=num_nodes; x++)
+////                        if(new_solution[n][x].label==1)
+////                    for(y=1;y<=num_nodes; y++)
+////                        if(new_solution[y][n].label==1)
+//                    edgeAdded = TRUE;
+//
+//                }
+//**************************************************************************************************************
+//                while (edgeAdded == FALSE)//add a random edge
+//                {
+//                    n = rand_btw(1,num_nodes,0);//select two random nodes
+//                    m = rand_btw(1,num_nodes,n);//prevent picking same node
+//
+//                    while(new_solution[n][m].label ==1)//while edge is in the current solution, find another edge until a non-solution edge that is achievable is found
+//                    {
+//                        n = rand_btw(1,num_nodes,0);
+//                        m = rand_btw(1,num_nodes,n);//prevent picking same node
+//                        while(new_solution[n][m].weight ==0)//while edge is not possible, find another edge until a possible edge is found
+//                        {
+//                            n = rand_btw(1,num_nodes,0);
+//                            m = rand_btw(1,num_nodes,n);//prevent picking same node
+//                        }
+//                    }
+//                    //at this point we have found a possible edge
+//                    //need to check if when we add
+//                    printf("\n Add Edge (%d %d)",n,m);
+//                    new_solution[n][m].label = 1;
+//                    edgeAdded = TRUE;
+//                }
+//*********************************************************************************************
+                num_edges = 1;//set number of edges back to default
+                for(x=1; x<=num_nodes; x++)//print out new_solution
+                    for(y=1; y<=num_nodes; y++)
+                    {
+                        if(new_solution[x][y].label == 1)
+                        printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,new_solution[x][y].weight);
+                    }
 
-                    while(new_solution[n][m].label ==1)//while edge is in the current solution, find another edge until a non-solution edge that is achievable is found
-                    {
-                        n = rand_btw(1,num_nodes);
-                        m = rand_btw(1,num_nodes);
-                        while(new_solution[n][m].weight ==0)//while edge is not possible, find another edge until a possible edge is found
-                        {
-                            n = rand_btw(1,num_nodes);
-                            m = rand_btw(1,num_nodes);
-                        }
-                    }
-                    printf("\nAdd Edge (%d %d)",n,m);
-                    new_solution[n][m].label = 1;
-                    edgeAdded = TRUE;
-                }
 //                //cost function
 //                for(x=1; x<=num_nodes; x++)
 //                {
 //                    weight =0;
 //                    for(y=1; y<=num_nodes; y++)
 //                        if(new_solution[x][y].label ==1)//check if edge is in the solution
-//                            if(weight<new_solution[x][y].weight)//find highest energy used per node
-//                                weight = new_solution[x][y].weight;
+//                        {
+//                            if(new_solution[x][y].calculated==0)//if not a symmetry edge
+//                                if(weight<new_solution[x][y].weight)//find highest energy used per node
+//                                    weight = new_solution[x][y].weight;
+//
+//                            new_solution[x][y].calculated=1;
+//                            new_solution[y][x].calculated=1;
+//                        }
 //                    new_cost += weight;//find total weight
 //                }
 //
@@ -267,7 +339,7 @@ int main()
 //                }
 //                else //if new_solution uses more energy maybe select it
 //                {
-//                    if (ap > rand_btw(0,1))
+//                    if (ap > rand_btw(0,1,0))
 //                    {
 //                        for(x=1; x<=num_nodes; x++)
 //                            for(y=1; y<=num_nodes; y++)
@@ -286,11 +358,14 @@ int main()
             T++;//
         }
 
-    printf("\n\n\n\nSolution is");
+   printf("\n\n\n\n Solution is");
     for(x=1; x<=num_nodes; x++)
+    {
+        printf("\n node %d:",x);
         for(y=1; y<=num_nodes; y++)
-           printf("%d",current_SA[x][y].label);
+           printf(" %d",current_SA[x][y].label);
+    }
 
-    printf("\nTotal cost is %d\n\n", old_cost);
+    printf("\n Total cost is %d\n\n", old_cost);
     return 0;
 }
