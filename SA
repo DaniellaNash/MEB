@@ -28,8 +28,34 @@ typedef struct Edge
 int rand_binary(void);
 int rand_btw(int Min, int Max,int not_including);
 double rand_percentage(void);
-
+void *dfs(int v, int num_nodes,edge new_solution[][10], int visited[]);
 int get_num_nodes(void);
+
+void *dfs(int v, int num_nodes, edge new_solution[][10],int visited[]) {
+	int i;
+    int x,y;
+	printf("\n\n\n\n new_solution Solution is");
+    for(x=1; x<=num_nodes; x++)
+    {
+        printf("\n node %d:",x);
+        for(y=1; y<=num_nodes; y++)
+           printf(" %d",new_solution[x][y].label);
+    }
+//
+//	visited[v]=1;
+//	printf("****visited:%d",v);
+//	for (i=1;i<=num_nodes;i++)
+//        if(new_solution[v][i].label==1)
+//        {
+//            printf("\n\nhere 1: %d %d",v,i);
+//            if (!visited[i]==1) //if not yet visited
+//            {
+//                printf("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> %d->%d",v,i);
+//                dfs(i, num_nodes, new_solution,visited);
+//            }
+//        }
+
+}
 
 int rand_binary(void)
 {
@@ -75,17 +101,6 @@ int rand_btw(int Min, int Max,int not_including)
     return random;
 }
 
-void DFS(void)
-{
-    int j,int i=1;
-    printf("\n*****visited: %d",i);
-    visited[i]=1;
-
-    for(j=0;j<n;j++)
-       if(!visited[j]&&G[i][j]==1)
-            DFS(j);
-}
-
 int get_num_nodes(void)
 {
     int num_nodes;
@@ -116,6 +131,8 @@ int main()
     int n,m,x,y,i=1,j;
     int a[10]={0},b[10]={0};
     int iteration =1;
+    int counter =0;
+    int nodeN_connection[10]={0}, nodeM_connections[10]={0};
     int edgeRemoved = FALSE, edgeAdded = FALSE;
 
 
@@ -138,6 +155,7 @@ int main()
             temp[x][y].weight = initial_SA[x][y].weight;//store data of weights as initial_SA.weight will be modified temporarily for calculations
             initial_SA[x][y].label =0;//initially start with no tree
             initial_SA[x][y].calculated=0;
+            visited[x]=0;
         }
 
     visited[1]=1;//set node one as the source node
@@ -250,34 +268,42 @@ int main()
                     new_solution[n][m].label =new_solution[m][n].label= 0;//remove this random edge from the solution
                     edgeRemoved = TRUE;//this separates the tree into two branches
                 }
-//                while (edgeAdded==FALSE)//add edge between the two branches to make a complete tree
-//                {
-//                    //find all nodes in branch of node n
+                while (edgeAdded==FALSE)//add edge between the two branches to make a complete tree
+                {
+                    //find all nodes in branch of node n
 //                    for(x=1; x<=num_nodes; x++)//for node n
-//                       if(new_solution[n][x].label==1)//all nodes connected to node n
+//						if(new_solution[n][x].label==1&&nodeM_connections[x]==0)//check if next node is connect to it and is not one that is already found
 //						{
-//							printf("node n is connected to node: %d",x);
+//							printf("\nnode1 n is connected to node: %d",x);
+//							nodeM_connections[x]=1;//state that node x is now found
+//							//now look at all nodes connected to the adjacent node found
+//							enter:
 //							for(y=1; y<=num_nodes; y++)//all other nodes x connected to
-//                                if(new_solution[x][y].label==1)
+//                                if(new_solution[x][y].label==1&&nodeM_connections[y]==0)
 //								{
-//									printf("node n is connected to nodes: %d",y);
+//									printf("\nnode1 n is connected to node: %d",x);
+//									nodeM_connections[x]=1;//state that node x is now found
+//									x=y;
+//									if(counter<=num_nodes)//check for all nodes
+//									{
+//										counter++;
+//										goto enter;
+//									}
 //								}
-//                    //find all nodes in branch of node m
-//**********************************************************************************************88
-//
-//
-//                    join a random node
-//                    check if all nodes are visited
-//                    if not join a different node
-//                    //check which node (n or m) is no longer visited
-//                    //i.e. solution x or y is not 1
-////                    for(x=1; x<=num_nodes; x++)
-////                        if(new_solution[n][x].label==1)
-////                    for(y=1;y<=num_nodes; y++)
-////                        if(new_solution[y][n].label==1)
-//                    edgeAdded = TRUE;
-//
-//                }
+//						}
+//**************************************************************************************************************
+//                    //DFS function
+                    for(x=1; x<=num_nodes; x++)
+                        visited[x]=0;
+                    dfs(n,num_nodes,new_solution,visited);
+                    printf("\n");
+
+                    for (i=1;i<=num_nodes;i++) {
+                        if(visited[i]==1)
+                          printf("\nnode1 n is connected to node: %d",i);
+                    }
+                    edgeAdded = TRUE;
+                }
 //**************************************************************************************************************
 //                while (edgeAdded == FALSE)//add a random edge
 //                {
@@ -306,7 +332,7 @@ int main()
                     for(y=1; y<=num_nodes; y++)
                     {
                         if(new_solution[x][y].label == 1)
-                        printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,new_solution[x][y].weight);
+                            printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,new_solution[x][y].weight);
                     }
 
 //                //cost function
