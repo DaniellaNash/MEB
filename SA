@@ -12,9 +12,8 @@
 //
 //loops --> exist if they have the same ancestor (Dept first Search)
 //If an unexplored edge leads to a node visited before, then the graph contains a cycle.
-//NO LONGEr EXISTS
+//NO LONGER EXISTS
 
-//make initialisation random
 //change weight to distance to power **do it in cost function
 //store data
 //
@@ -23,7 +22,6 @@
 //remove random node, this splits the tree into two branches
 //add edge from each branch randomly
 //find nodes at each branch using DFS
-//CHECK THIS
 
 
 typedef struct Edge
@@ -33,12 +31,11 @@ typedef struct Edge
     int calculated;
 } edge;
 
-int rand_binary(void);
-int rand_btw(int Min, int Max,int not_including);
-double rand_percentage(void);
+int rand_binary(void);// 0 or 1
+int rand_btw(int Min, int Max,int not_including);//random number between
+float rand_float(void);//between 0 and 1
 void *dfs(int v, int num_nodes,edge new_solution[][10], int visited[]);
-int *dfs_cost(int v, int num_nodes, edge new_solution[][10],int visited[],int weight, int new_cost);
-int *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[],int weight, int x,int y);
+void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[],int weight);
 int get_num_nodes(void);
 
 void *dfs(int v, int num_nodes, edge new_solution[][10],int visited[])
@@ -53,70 +50,13 @@ void *dfs(int v, int num_nodes, edge new_solution[][10],int visited[])
     return 0;
 }
 
-int *dfs_cost(int v, int num_nodes, edge new_solution[][10],int visited[],int weight, int new_cost)
+void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[],int weight)
 {
     int i;
 
 	visited[v]=1;//mark the node as visited
-	for (i=1;i<=num_nodes;i++)//for all the nodes it is connected to
-    {
-        if(new_solution[v][i].label==1)//i.e. has an edge in the solution
-        {
-            if (!visited[i]==1) //if that edge is connected to a non visited node
-            {
-                if(new_solution[v][i].calculated==0)//and if not a symmetry edge
-                {
-                    printf("\n switch1 order of edge (%d %d) to (%d %d)",v,i,i,v);
-                    new_solution[v][i].label = 0;//swap order around
-                    new_solution[i][v].label = 1;
-                    if(weight<new_solution[v][i].weight)//find highest energy used per node
-                    {
-                        weight = (new_solution[v][i].weight);
-                        dfs_cost(i, num_nodes, new_solution,visited, weight,new_cost);
-                    }
-                }
 
-                new_solution[v][i].calculated=1;
-                new_solution[i][v].calculated=1;
-            }
-        }
-        new_cost += weight;//find total weight
-    }
-
-    printf("\n Total cost is %d", new_cost);
-
-    return new_cost;
-}
-
-int *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[],int weight, int x,int y)
-{
-    int i;
-
-	visited[v]=1;//mark the node as visited
-//	for (i=1;i<=num_nodes;i++)//for all the nodes it is connected to
-//    {
-//      //  if (i!=x &&v !=y)//not including newly added edge
-//            if((new_solution[v][i].label==1||new_solution[i][v].label==1))//i.e. has an edge in the solution
-//                if (!visited[i]==1) //if that edge is connected to a non visited node
-//                {
-//                        if(new_solution[i][v].label==1)
-//                        {
-//                            new_solution[v][i].label = 0;
-//                            printf("\n switch1 order of edge (%d %d) to (%d %d)",v,i,i,v);
-//                            new_solution[i][v].label = 1;//swap order around
-//                        }
-//                        else
-//                        {
-//                            new_solution[v][i].label = 1;//swap order around
-//                            new_solution[i][v].label = 0;
-//
-//                        }
-//
-//                        dfs_swap(i, num_nodes, new_solution,visited, weight,x,y);
-//                }
-//    }
-//*******************************************************************************************
-for (i=1;i<=num_nodes;i++)//for all edges
+    for (i=1;i<=num_nodes;i++)//for all edges
     {
       //  if (i!=x &&v !=y)//not including newly added edge
          if(!visited[i]==1)//with nodes not yet visited
@@ -130,13 +70,12 @@ for (i=1;i<=num_nodes;i++)//for all edges
                     }
             if(new_solution[v][i].label ==1)
             {
-                dfs_swap(i, num_nodes, new_solution,visited, weight,x,y);
+                dfs_swap(i, num_nodes, new_solution,visited, weight);
             }
 
          }
     }
 }
-
 
 int rand_binary(void)
 {
@@ -144,17 +83,6 @@ int rand_binary(void)
 
     random = rand()%2;
     return random;
-}
-
-double rand_percentage(void)
-{
-    double random_value; // random value betw
-
-    random_value = ((float)rand()/(float)(RAND_MAX+1))*100;//version 1
-//    Alternatively:
-//    random_value = ((rand()%10000000)/10000000);
-
-    return random_value;
 }
 
 int rand_btw(int Min, int Max,int not_including)
@@ -182,6 +110,12 @@ redo:
     return random;
 }
 
+float rand_float(void)
+{
+    float random;
+    random = ((float) rand()) / (float) RAND_MAX;
+    return random;
+}
 int get_num_nodes(void)
 {
     int num_nodes;
@@ -193,12 +127,12 @@ int get_num_nodes(void)
 int main()
 {
     //initialise data
-    double T = 1.0;//"Usually, the temperature is started at 1.0 and is decreased at the end of each iteration by multiplying it by a constant called α" 7
+    float T = 1.0;//"Usually, the temperature is started at 1.0 and is decreased at the end of each iteration by multiplying it by a constant called α" 7
     //by http://katrinaeg.com/simulated-annealing.html
     //typical choices are between 0.8 and 0.99.
-    double T_min = 0.00001; //min temp to be reached
-    double alpha = 0.9;//depreciation constant used for temperature after each iteration
-    double ap=0.0;
+    float T_min = 0.00001; //min temp to be reached
+    float alpha = 0.9;//depreciation constant used for temperature after each iteration
+    float ap=0.0;
     int delta=0;
 
     //set default setting
@@ -211,7 +145,7 @@ int main()
     //set other variables
     int rand;
     int n,m,n_new,m_new;
-    int x,y,i=1,j;
+    int x,y,i=1,j,compare_process=1;
     int a[10]= {0},b[10]= {0};
     int iteration =1;
     int counter =0, source =0;
@@ -328,19 +262,18 @@ int main()
     printf("\n First iteration cost = %d\n",old_cost);
 
     //main algorithm
-    T=0;
-    while (T <=5)//max generation //CHANGE THIS BACK TO T<=T_min
+    printf("\n T: %f > T_min: %f",T,T_min);
+    while (T > T_min)//max generation //CHANGE THIS BACK TO T<=T_min
     {
-        printf("\n\n    Iteration: %d",iteration++);
         fprintf(fp,"\n\t\t%i\t\t\t%d\t\t",iteration,old_cost );
-        for(i=1; i<num_nodes; i++)
-        {
-            fprintf(fp,"%d",current_SA[y][x].label);
-        }
+        for(x=1; x<=num_nodes; x++)//print out new_solution
+            for(y=1; y<=num_nodes; y++)
+                if(current_SA[x][y].label == 1)
+                    fprintf(fp,"(%d -> %d) ",x,y);
+        printf("\n\n    Iteration:*************************************************%d",iteration++);
 
-        i = 1;//reset counter for neighbor-cost-compare-move process
-        //CHANGE BACK TO i<=100
-        while (i <= 2)//"neighbor-cost-compare-move process
+        compare_process=1;
+        while (compare_process <= 1)//"neighbor-cost-compare-move process
             //process is carried about many times (typically somewhere between 100 and 1,000) at each temperature"
             //by http:katrinaeg.com/simulated-annealing.html
         {
@@ -481,15 +414,12 @@ int main()
                 }
                 edgeAdded = TRUE;
             }
-            for(x=1; x<=num_nodes; x++)
-                for(y=1; y<=num_nodes; y++)
-                    new_solution[x][y].calculated=0;
+
 //*******************************************************************************************************************************
             //REVERSE ORFER OF SECOND BRANCH - !!! CHECK THIS
             for(x=1; x<=num_nodes; x++)
                 for(y=1; y<=num_nodes; y++)
                 {
-                    new_solution[x][y].calculated=0;
                     visited[x]=0;
                 }
 
@@ -498,62 +428,19 @@ int main()
              weight =0;
             if (source ==0)//branchN has the source node so look at branchM
             {
-                //new_solution[n_new][m_new].calculated=1;
-               // new_cost = dfs_cost(1,num_nodes,new_solution,visited,weight,new_cost);//switch
-                dfs_swap( 1, num_nodes, new_solution, visited, weight,n_new,m_new);
+                dfs_swap( 1, num_nodes, new_solution, visited, weight);
                 printf("\n done swapping");
                 //cost
             }
             else//for all edges of the second branch (the one without the source node)
             {
-                //new_solution[m_new][n_new].calculated=1;
-                //new_cost = dfs_cost(1,num_nodes,new_solution,visited,weight,new_cost);
-                dfs_swap( 1, num_nodes, new_solution, visited, weight,m_new,n_new);
+                dfs_swap( 1, num_nodes, new_solution, visited, weight);
                 printf("\n done swapping");
             }
 
-//            for(x=1; x<=num_nodes; x++)//for all edges
-//                for(y=1; y<=num_nodes; y++)
-//                {
-//                    //for all edges of the second branch (the one without the source node)
-//                    if (source ==0)//branchN has the source node so look at branchM
-//                    {
-//                        new_solution[m_new][n_new].calculated =1;
-//
-////                        if (branchM[x]==1)
-////                            if(new_solution[x][y].label == 1)//if edge is in solution of branch M
-////                                if( new_solution[x][y].calculated==0)
-////                                {
-////                                    printf("\n switch1 order of edge (%d %d) to (%d %d)",x,y,y,x);
-////                                    new_solution[x][y].label = 0;//swap order around
-////                                    new_solution[y][x].label = 1;
-////                                    new_solution[x][y].calculated=1;
-////                                    new_solution[y][x].calculated=1;
-////                                }
-//
-//                    }
-//                    else//for all edges of the second branch (the one without the source node)
-//                    {
-//                        new_solution[m_new][n_new].calculated=1;
-////                        if (branchN[x]==1)//branchM has the source node so look at branchN
-////                            if(new_solution[x][y].label == 1)//if edge is in solution
-////                                if( new_solution[x][y].calculated==0)
-////                                {
-////                                    printf("\n switch2 order of edge (%d %d) to (%d %d)",x,y,y,x);
-////                                    new_solution[x][y].label = 0;//swap order around
-////                                    new_solution[y][x].label = 1;
-////                                    new_solution[x][y].calculated=1;
-////                                    new_solution[y][x].calculated=1;
-////                                }
-//                    }
-//                }
 //************************************************************************************************************************************
             for(x=1; x<=num_nodes; x++)
-                for(y=1; y<=num_nodes; y++)
-                {
-                    new_solution[x][y].calculated=0;
                     visited[x]=0;
-                }
 
             new_cost = 0;
             num_edges = 1;//set number of edges back to default
@@ -563,52 +450,50 @@ int main()
                 for(y=1; y<=num_nodes; y++)
                     if(new_solution[x][y].label == 1)
                     {
-                        //if(new_solution[x][y].calculated==0)//if not a symmetry edge
-                       // {
                             printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,new_solution[x][y].weight);
                             if(weight<new_solution[x][y].weight)//find highest energy used per node
                             {
                                 weight = new_solution[x][y].weight;
                                 printf("\n weigth:%d accum:%d",weight, new_cost);
                             }
-                       // }
-                        new_solution[x][y].calculated=1;
-                        new_solution[y][x].calculated=1;
                     }
                 new_cost += weight;//find total weight
             }
             printf("\n Total cost is %d\n\n", new_cost);
-//
-//                //acceptance probability function
-//                delta = (old_cost-new_cost);
-//                ap = (exp(-delta/T)); //this is the typical equation used
-//
-//                if(new_cost < old_cost)//if new_solution has less energy select it
-//                {
-//                    for(x=1; x<=num_nodes; x++)
-//                        for(y=1; y<=num_nodes; y++)
-//                            current_SA[x][y] = new_solution[x][y];
-//                    old_cost = new_cost;
-//                }
-//                else //if new_solution uses more energy maybe select it
-//                {
-//                    if (ap > rand_btw(0,1,0))
-//                    {
-//                        for(x=1; x<=num_nodes; x++)
-//                            for(y=1; y<=num_nodes; y++)
-//                                current_SA[x][y] = new_solution[x][y];
-//                        old_cost = new_cost;
-//                    }
-//                }
 
-            i += 1;
+                //acceptance probability function
+                delta = (old_cost-new_cost);
+                ap = (exp(-delta/T)); //this is the typical equation used
+
+                if(new_cost < old_cost)//if new_solution has less energy select it
+                {
+                    fprintf(fp,"NO");
+                    for(x=1; x<=num_nodes; x++)
+                        for(y=1; y<=num_nodes; y++)
+                            current_SA[x][y] = new_solution[x][y];
+                    old_cost = new_cost;
+                }
+                else //if new_solution uses more energy maybe select it
+                {
+                    if (ap > rand_float())
+                    {
+                        fprintf(fp,"YES");
+                        for(x=1; x<=num_nodes; x++)
+                            for(y=1; y<=num_nodes; y++)
+                                current_SA[x][y] = new_solution[x][y];
+                        old_cost = new_cost;
+                    }
+                }
+
+            compare_process += 50;
             edgeAdded = FALSE;//reset value
             edgeRemoved = FALSE;//reset value
         }
         //temperature decreases by a factor of alpha after each generation until the minimum temp is reached
-        //T = T*alpha;
-        //CHANGE T + T*ALPHA BACK
-        T++;//
+        T = T*alpha;
+        compare_process += 1;
+       // = T++;
+        printf("T= %f",T);
     }
 
     printf("\n\n\n\n ****Final Solution is****");
