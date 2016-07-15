@@ -54,12 +54,6 @@ void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge initial
 void *get_network_topology( int num_nodes, edge initial_SA[][10], edge temp[][10],int visited[]);
 int get_num_nodes(void);
 
-
-
-
-
-
-
 void *dfs(int v, int num_nodes, edge new_solution[][10],int visited[])
 {
     int i;
@@ -204,8 +198,12 @@ void *add_edge(int num_nodes,edge new_solution[][10], int n, int m )
     int source;
     int n_new,m_new;
     int edgeAdded=FALSE;
-    int visited[10]={0};
-    int branchN [10] = {0},branchM [10] = {0};
+    int *visited;
+    int *branchN,*branchM;
+
+    branchN = (int *)malloc(num_nodes * sizeof(int));
+    branchM = (int *)malloc(num_nodes * sizeof(int));
+    visited = (int *)malloc(num_nodes * sizeof(int));
 
     //DFS function
     //find nodes in n branch using DFS
@@ -216,6 +214,7 @@ void *add_edge(int num_nodes,edge new_solution[][10], int n, int m )
         {
             branchN[x]=0;
             branchM[x]=0;
+            visited[x]=0;
         }
         dfs(n,num_nodes,new_solution,branchN);
         dfs(m,num_nodes,new_solution,branchM); //find nodes in n branch using DFS
@@ -337,7 +336,10 @@ int check_deadend(int num_nodes,edge new_solution[][10],int n,int m )
     int count2=0;
     int x,y;
     int deadend = FALSE;
-    int branchN [10] = {0},branchM [10] = {0};
+    int *branchN,*branchM;
+
+    branchN = (int *)malloc(num_nodes * sizeof(int));
+    branchM = (int *)malloc(num_nodes * sizeof(int));
 
     //delete edge only if it is not a dead end
     for(x=1; x<=num_nodes; x++)//create storage space to list nodes in each branch
@@ -467,8 +469,10 @@ void *get_network_topology( int num_nodes, edge initial_SA[][10], edge temp[][10
 int get_num_nodes(void)
 {
     int num_nodes;
+
     printf("\nEnter the number of nodes:");
     scanf("%d",&num_nodes);
+
     return num_nodes;
 }
 
@@ -480,17 +484,12 @@ int main()
     //typical choices are between 0.8 and 0.99.
     float T_min = 0.00001; //min temp to be reached
     float alpha = 0.9;//depreciation constant used for temperature after each iteration
-
-    //set cost default setting
-    int old_cost=0,new_cost=0;
-
-    //set neighbour solution default setting
-    int compare_process=1;
-
+    int old_cost=0,new_cost=0;//set cost default setting
+    int compare_process=1; //set neighbour solution default setting
     //declare and initialise other variables
     int x,y;
     int iteration =1;
-    int visited [10]= {0};
+    int *visited;
     int num_nodes =0,num_edges=1;
 
     FILE *fp;
@@ -510,6 +509,8 @@ int main()
     edge current_SA[10][10];
     edge new_solution[10][10];
     edge temp[10][10];
+
+    visited = (int *)malloc(num_nodes * sizeof(int));
 
     get_network_topology(num_nodes,initial_SA,temp,visited);//get network topology
     gen_init_solution(num_edges, num_nodes, visited,initial_SA, temp, current_SA);//generate initial random solution (TREE MST - no loops)
