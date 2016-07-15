@@ -75,6 +75,7 @@ void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[],int w
 
          }
     }
+    return 0;
 }
 
 int rand_binary(void)
@@ -145,12 +146,10 @@ int main()
     //set other variables
     int rand;
     int n,m,n_new,m_new;
-    int x,y,i=1,j,compare_process=1;
-    int a[10]= {0},b[10]= {0};
+    int x,y,i=1,compare_process=1;
     int iteration =1;
-    int counter =0, source =0;
+    int source =0;
     int count1 = 0, count2=0,set;
-    int nodeN_connection[10]= {0}, nodeM_connections[10]= {0};
     int edgeRemoved = FALSE, edgeAdded = FALSE;
 
     FILE *fp;
@@ -170,8 +169,6 @@ int main()
     edge current_SA[10][10];
     edge new_solution[10][10];
     edge temp[10][10];
-    edge same_edge[10][10];
-    edge energy[10][10];
 
     //ask for the energy needed of each edge the node takes and store them
     printf("\nEnter the network topology matrix:\n");
@@ -226,14 +223,10 @@ int main()
         for(y=1; y<=num_nodes; y++)
             initial_SA[x][y].weight = temp[x][y].weight;
 
-    //set current solution to the initial solution generated
+    //set current solution to the initial solution generated and set it as our best solution so far
     for(x=1; x<=num_nodes; x++)
         for(y=1; y<=num_nodes; y++)
-        {
-            current_SA[x][y].weight = initial_SA[x][y].weight;
-            current_SA[x][y].label = initial_SA[x][y].label;
-            current_SA[x][y].calculated = initial_SA[x][y].calculated;
-        }
+            current_SA[x][y] = initial_SA[x][y];
 
     printf("\n\n\n\n Initial Solution is");
     for(x=1; x<=num_nodes; x++)
@@ -249,14 +242,8 @@ int main()
         weight =0;
         for(y=1; y<=num_nodes; y++)
             if(current_SA[x][y].label ==1)//check if edge is in the solution
-            {
-                if(current_SA[x][y].calculated==0)//if not a symmetry edge
-                    if(weight<current_SA[x][y].weight)//find highest energy used per node
-                        weight = current_SA[x][y].weight;
-
-                current_SA[x][y].calculated=1;//make calculated values
-                current_SA[y][x].calculated=1;
-            }
+                if(weight<current_SA[x][y].weight)//find highest energy used per node
+                    weight = current_SA[x][y].weight;
         old_cost += weight;//find total weight
     }
     printf("\n First iteration cost = %d\n",old_cost);
@@ -273,7 +260,7 @@ int main()
         printf("\n\n    Iteration:*************************************************%d",iteration++);
 
         compare_process=1;
-        while (compare_process <= 1)//"neighbor-cost-compare-move process
+        while (compare_process <= 100)//"neighbor-cost-compare-move process
             //process is carried about many times (typically somewhere between 100 and 1,000) at each temperature"
             //by http:katrinaeg.com/simulated-annealing.html
         {
@@ -463,7 +450,7 @@ int main()
 
                 //acceptance probability function
                 delta = (old_cost-new_cost);
-                ap = (exp(-delta/T)); //this is the typical equation used
+                ap = (exp(delta/T)); //this is the typical equation used
 
                 if(new_cost < old_cost)//if new_solution has less energy select it
                 {
