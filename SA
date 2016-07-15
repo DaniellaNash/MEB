@@ -27,15 +27,27 @@
 typedef struct Edge
 {
     int weight;//distance
-    int label;
-    int calculated;
+    int label;//solution
 } edge;
 
+//random number generator
 int rand_binary(void);// 0 or 1
 int rand_btw(int Min, int Max,int not_including);//random number between
 float rand_float(void);//between 0 and 1
-void *dfs(int v, int num_nodes,edge new_solution[][10], int visited[]);
-void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[],int weight);
+
+//tree traversal
+void *dfs(int v, int num_nodes,edge new_solution[][10], int visited[]);//for identifying which nodes are in which branch
+void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[]);//for fixing node/edge ancestry
+
+//main SA
+int *acceptance_prob(float T, int old_cost, int new_cost,edge new_solution[][10], edge current_SA[][10],FILE *fp, int num_nodes);
+int *cost(int num_nodes, edge new_solution[][10]);
+void *add_edge(int source,int  branchN[],int  branchM[],int num_nodes,edge new_solution[][10], int n, int m  );
+void *print_output_file(int iteration, int old_cost, int num_nodes,edge current_SA[][10],FILE *fp);
+
+//initial SA setup
+void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge initial_SA[][10],edge temp[][10],edge current_SA[][10]);
+void *get_network_topology( int num_nodes, edge initial_SA[][10], edge temp[][10],int visited[]);
 int get_num_nodes(void);
 
 void *dfs(int v, int num_nodes, edge new_solution[][10],int visited[])
@@ -50,7 +62,7 @@ void *dfs(int v, int num_nodes, edge new_solution[][10],int visited[])
     return 0;
 }
 
-void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[],int weight)
+void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[])
 {
     int i;
 
@@ -70,7 +82,7 @@ void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[],int w
                     }
             if(new_solution[v][i].label ==1)
             {
-                dfs_swap(i, num_nodes, new_solution,visited, weight);
+                dfs_swap(i, num_nodes, new_solution,visited);
             }
 
          }
@@ -117,77 +129,155 @@ float rand_float(void)
     random = ((float) rand()) / (float) RAND_MAX;
     return random;
 }
-int get_num_nodes(void)
+
+int *cost(int num_nodes, edge new_solution[][10])
 {
-    int num_nodes;
-    printf("\nEnter the number of nodes:");
-    scanf("%d",&num_nodes);
-    return num_nodes;
+    int new_cost = 0;
+    int num_edges = 1;//set number of edges back to default
+    int x,y, weight;
+
+    for(x=1; x<=num_nodes; x++)//print out new_solution
+    {
+        weight =0;//find the largest tx on each node
+        for(y=1; y<=num_nodes; y++)
+            if(new_solution[x][y].label == 1)
+            {
+                    printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,new_solution[x][y].weight);
+                    if(weight<new_solution[x][y].weight)//find highest energy used per node
+                    {
+                        weight = new_solution[x][y].weight;
+                        printf("\n weigth:%d accum:%d",weight, new_cost);
+                    }
+            }
+        new_cost += weight;//find total weight
+    }
+    printf("\n Total cost is %d\n\n", new_cost);
+    return new_cost;
 }
 
-int main()
+int *acceptance_prob(float T, int old_cost, int new_cost,edge new_solution[][10], edge current_SA[][10],FILE *fp, int num_nodes )
 {
-    //initialise data
-    float T = 1.0;//"Usually, the temperature is started at 1.0 and is decreased at the end of each iteration by multiplying it by a constant called α" 7
-    //by http://katrinaeg.com/simulated-annealing.html
-    //typical choices are between 0.8 and 0.99.
-    float T_min = 0.00001; //min temp to be reached
-    float alpha = 0.9;//depreciation constant used for temperature after each iteration
-    float ap=0.0;
-    int delta=0;
+    int delta=0 ,x,y;
+    float ap = 0.0;
 
-    //set default setting
-    int num_edges=1;
-    int old_cost=0,new_cost=0;
-    int num_nodes =0, weight =0;
-    int visited [400]= {0}; //set all nodes
-    int branchN [400] = {0},branchM [400] = {0};
+    delta = (old_cost-new_cost);
+    ap = (exp(delta/T)); //this is the typical equation used
 
-    //set other variables
-    int rand;
-    int n,m,n_new,m_new;
-    int x,y,i=1,compare_process=1;
-    int iteration =1;
-    int source =0;
-    int count1 = 0, count2=0,set;
-    int edgeRemoved = FALSE, edgeAdded = FALSE;
-
-    FILE *fp;
-
-    //creating new file with write mode
-    fp=fopen("testSA.txt","w");
-    if(fp==NULL)
+    if(new_cost < old_cost)//if new_solution has less energy select it
     {
-        printf("Error!");
-        exit(1);
+        fprintf(fp,"NO");
+        for(x=1; x<=num_nodes; x++)
+            for(y=1; y<=num_nodes; y++)
+                current_SA[x][y] = new_solution[x][y];
+        old_cost = new_cost;
     }
-    fprintf(fp,"%s %s\t%s %s\t%s\n" ,"Iteration","number","Total",
-            "Energy","Solution");
-
-    num_nodes = get_num_nodes();
-    edge initial_SA[10][10];
-    edge current_SA[10][10];
-    edge new_solution[10][10];
-    edge temp[10][10];
-
-    //ask for the energy needed of each edge the node takes and store them
-    printf("\nEnter the network topology matrix:\n");
-    for(x=1; x<=num_nodes; x++)
-        for(y=1; y<=num_nodes; y++)
-            scanf("%d",&initial_SA[x][y].weight);//Note that 0 = out of tx range of the node
-
-    for(x=1; x<=num_nodes; x++)
-        for(y=1; y<=num_nodes; y++)
+    else //if new_solution uses more energy maybe select it
+    {
+        if (ap > rand_float())
         {
-            temp[x][y].weight = initial_SA[x][y].weight;//store data of weights as initial_SA.weight will be modified temporarily for calculations
-            initial_SA[x][y].label =0;//initially start with no tree
-            initial_SA[x][y].calculated=0;
-            visited[x]=0;
+            fprintf(fp,"YES");
+            for(x=1; x<=num_nodes; x++)
+                for(y=1; y<=num_nodes; y++)
+                    current_SA[x][y] = new_solution[x][y];
+            old_cost = new_cost;
         }
+    }
+    return old_cost;
+}
 
-    visited[1]=1;//set node one as the source node
+void *add_edge(int source,int  branchN[],int  branchM[],int num_nodes,edge new_solution[][10], int n, int m )
+{
+    int x,i,n_new,m_new;
+    int edgeAdded=FALSE;
+    //DFS function
+    //find nodes in n branch using DFS
+    while (edgeAdded==FALSE)//add edge between the two branches to make a complete tree
+    {
+        source = 0;
+        for(x=1; x<=num_nodes; x++)//create storage space to list nodes in each branch
+        {
+            branchN[x]=0;
+            branchM[x]=0;
+        }
+        dfs(n,num_nodes,new_solution,branchN);
+        dfs(m,num_nodes,new_solution,branchM); //find nodes in n branch using DFS
+       // printf("\n node N is connected to node:");
+        for (i=1; i<=num_nodes; i++)
+            if(branchN[i]==1)
+            {
+              //  printf(" %d",i);//print nodes connected to n
+                if (i==1)
+                    source = 0;//make note of which branch the source node is in
+            }
+       // printf("\n node M is connected to node: ");
+        for (i=1; i<=num_nodes; i++)
+            if(branchM[i]==1)
+            {
+              //  printf("% d",i);//print nodes connected to m
+                if (i==1)
+                    source=1;//make note of which branch the source node is in
 
-    //generate initial random solution (TREE MST - no loops)
+            }
+        //select random node from each branch branchM and branchN
+        n_new = rand_btw(1,num_nodes,0);//select two random nodes
+        m_new = rand_btw(1,num_nodes,n_new);
+        while(branchN[n_new]==0)//make sure random node is in the correct branch
+            n_new = rand_btw(1,num_nodes,0);
+        while(branchM[m_new]==0)
+            m_new = rand_btw(1,num_nodes,0);
+        while((n==n_new && m==m_new)|| (n==m_new && m==n_new))//make sure the edge is not the same as the one just removed
+        {
+            here:
+            n_new = rand_btw(1,num_nodes,0);//select two random nodes
+            m_new = rand_btw(1,num_nodes,n_new);
+            while(branchN[n_new]==0)//make sure random node is in the correct branch
+                n_new = rand_btw(1,num_nodes,0);
+            while(branchM[m_new]==0)
+                m_new = rand_btw(1,num_nodes,0);
+        }
+        while(new_solution[n_new][m_new].weight ==0)//while edge is not possible, find another edge until a possible edge is found
+        {
+            n_new = rand_btw(1,num_nodes,0);//select two random nodes
+            m_new = rand_btw(1,num_nodes,n_new);
+            while(branchN[n_new]==0)//make sure random node is in the correct branch
+                n_new = rand_btw(1,num_nodes,0);
+            while(branchM[m_new]==0)
+                m_new = rand_btw(1,num_nodes,0);
+            while((n==n_new && m==m_new)|| (n==m_new && m==n_new))//make sure the edge is not the same as the one just removed
+            {
+                goto here;
+            }
+        }
+        if (source ==0)
+        {
+            printf("\n Add Edge1 (%d %d)",n_new,m_new);
+            new_solution[n_new][m_new].label= 1;//add this random edge to the solution
+        }
+        else
+        {
+            printf("\n Add Edge2 (%d %d)",m_new,n_new);
+            new_solution[m_new][n_new].label= 1;
+        }
+        edgeAdded = TRUE;
+    }
+}
+
+void *print_output_file(int iteration, int old_cost, int num_nodes,edge current_SA[][10], FILE *fp)
+{
+    int x,y;
+
+    fprintf(fp,"\n\t\t%i\t\t\t%d\t\t",iteration,old_cost );
+    for(x=1; x<=num_nodes; x++)//print out new_solution
+        for(y=1; y<=num_nodes; y++)
+            if(current_SA[x][y].label == 1)
+                fprintf(fp,"(%d -> %d) ",x,y);
+    return 0;
+}
+
+void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge initial_SA[][10],edge temp[][10],edge current_SA[][10])
+{
+    int x,y,rand,n;
+
     while(num_edges < num_nodes)//have required #edges = #node-1
     {
         for(x=1; x<=num_nodes; x++)
@@ -227,39 +317,96 @@ int main()
     for(x=1; x<=num_nodes; x++)
         for(y=1; y<=num_nodes; y++)
             current_SA[x][y] = initial_SA[x][y];
+    return 0;
+}
 
-    printf("\n\n\n\n Initial Solution is");
+void *get_network_topology( int num_nodes, edge initial_SA[][10], edge temp[][10], int visited[])
+{
+    int x,y;
+    //ask for the energy needed of each edge the node takes and store them
+    printf("\nEnter the network topology matrix:\n");
     for(x=1; x<=num_nodes; x++)
-    {
-        printf("\n node %d:",x);
         for(y=1; y<=num_nodes; y++)
-            printf(" %d",current_SA[x][y].label);
-    }
+            scanf("%d",&initial_SA[x][y].weight);//Note that 0 = out of tx range of the node
 
-    //cost function
     for(x=1; x<=num_nodes; x++)
-    {
-        weight =0;
         for(y=1; y<=num_nodes; y++)
-            if(current_SA[x][y].label ==1)//check if edge is in the solution
-                if(weight<current_SA[x][y].weight)//find highest energy used per node
-                    weight = current_SA[x][y].weight;
-        old_cost += weight;//find total weight
+        {
+            temp[x][y].weight = initial_SA[x][y].weight;//store data of weights as initial_SA.weight will be modified temporarily for calculations
+            initial_SA[x][y].label =0;//initially start with no tree
+            visited[x]=0;//no nodes visited at the start
+        }
+
+    visited[1]=1;//set node one as the source node
+    return 0;
+
+}
+
+int get_num_nodes(void)
+{
+    int num_nodes;
+    printf("\nEnter the number of nodes:");
+    scanf("%d",&num_nodes);
+    return num_nodes;
+}
+
+int main()
+{
+    //initialise data
+    float T = 1.0;//"Usually, the temperature is started at 1.0 and is decreased at the end of each iteration by multiplying it by a constant called α" 7
+    //by http://katrinaeg.com/simulated-annealing.html
+    //typical choices are between 0.8 and 0.99.
+    float T_min = 0.00001; //min temp to be reached
+    float alpha = 0.9;//depreciation constant used for temperature after each iteration
+
+    //set cost default setting
+    int old_cost=0,new_cost=0;
+
+    //set neighbour solution default setting
+    int source =0;
+    int n,m;
+    int compare_process=1;
+    int branchN [400] = {0},branchM [400] = {0};
+    int edgeRemoved = FALSE, edgeAdded = FALSE;
+
+    //declare and initialise other variables
+    int x,y,i=1;
+    int iteration =1;
+    int visited [400]= {0};
+    int num_nodes =0,num_edges=1;
+    int count1 = 0, count2=0,set;
+
+    FILE *fp;
+
+    //creating new file with write mode
+    fp=fopen("testSA.txt","w");
+    if(fp==NULL)
+    {
+        printf("Error!");
+        exit(1);
     }
+    fprintf(fp,"%s %s\t%s %s\t%s\n" ,"Iteration","number","Total",
+            "Energy","Solution");
+
+    num_nodes = get_num_nodes();
+    edge initial_SA[10][10];
+    edge current_SA[10][10];
+    edge new_solution[10][10];
+    edge temp[10][10];
+
+    get_network_topology(num_nodes,initial_SA,temp,visited);//get network topology
+    gen_init_solution(num_edges, num_nodes, visited,initial_SA, temp, current_SA);//generate initial random solution (TREE MST - no loops)
+    old_cost = cost( num_nodes, current_SA);//print solution and cost
+
     printf("\n First iteration cost = %d\n",old_cost);
 
     //main algorithm
-    printf("\n T: %f > T_min: %f",T,T_min);
     while (T > T_min)//max generation //CHANGE THIS BACK TO T<=T_min
     {
-        fprintf(fp,"\n\t\t%i\t\t\t%d\t\t",iteration,old_cost );
-        for(x=1; x<=num_nodes; x++)//print out new_solution
-            for(y=1; y<=num_nodes; y++)
-                if(current_SA[x][y].label == 1)
-                    fprintf(fp,"(%d -> %d) ",x,y);
-        printf("\n\n    Iteration:*************************************************%d",iteration++);
-
+        print_output_file(iteration, old_cost, num_nodes, current_SA, fp);
+        printf("\n\n    Iteration: %d",iteration++);
         compare_process=1;
+
         while (compare_process <= 100)//"neighbor-cost-compare-move process
             //process is carried about many times (typically somewhere between 100 and 1,000) at each temperature"
             //by http:katrinaeg.com/simulated-annealing.html
@@ -277,6 +424,7 @@ int main()
                 here2:
                 n = rand_btw(1,num_nodes,0);//select two random nodes to remove the edge from
                 m = rand_btw(1,num_nodes,n);
+
                 while(new_solution[n][m].label ==0)//make sure that the edge is in the current solution.//while edge is not in solution, find another edge until solution edge is found. Note, if edge is in current solution then edge is also possible i.e. has a weight>0
                 {
                     n = rand_btw(1,num_nodes,0);
@@ -293,7 +441,6 @@ int main()
                     set=1;
                     new_solution[n][m].label= 0;
                 }
-
 
                 //delete edge only if it is not a dead end
                  for(x=1; x<=num_nodes; x++)//create storage space to list nodes in each branch
@@ -330,157 +477,24 @@ int main()
                 new_solution[n][m].label =new_solution[m][n].label= 0;//remove this random edge from the solution
                 edgeRemoved = TRUE;//this separates the tree into two branches
             }
-            while (edgeAdded==FALSE)//add edge between the two branches to make a complete tree
-            {
-                //DFS function
-                //find nodes in n branch using DFS
-                source = 0;
-                for(x=1; x<=num_nodes; x++)//create storage space to list nodes in each branch
-                {
-                    branchN[x]=0;
-                    branchM[x]=0;
-                }
-                dfs(n,num_nodes,new_solution,branchN);
-                dfs(m,num_nodes,new_solution,branchM); //find nodes in n branch using DFS
-                printf("\n node N is connected to node:");
-                for (i=1; i<=num_nodes; i++)
-                    if(branchN[i]==1)
-                    {
-                        printf(" %d",i);//print nodes connected to n
-                        if (i==1)
-                            source = 0;//make note of which branch the source node is in
-                    }
-                printf("\n node M is connected to node: ");
-                for (i=1; i<=num_nodes; i++)
-                    if(branchM[i]==1)
-                    {
-                        printf("% d",i);//print nodes connected to m
-                        if (i==1)
-                            source=1;//make note of which branch the source node is in
 
-                    }
-                //select random node from each branch branchM and branchN
-                n_new = rand_btw(1,num_nodes,0);//select two random nodes
-                m_new = rand_btw(1,num_nodes,n_new);
-                while(branchN[n_new]==0)//make sure random node is in the correct branch
-                    n_new = rand_btw(1,num_nodes,0);
-                while(branchM[m_new]==0)
-                    m_new = rand_btw(1,num_nodes,0);
-                while((n==n_new && m==m_new)|| (n==m_new && m==n_new))//make sure the edge is not the same as the one just removed
-                {
-                    here:
-                    n_new = rand_btw(1,num_nodes,0);//select two random nodes
-                    m_new = rand_btw(1,num_nodes,n_new);
-                    while(branchN[n_new]==0)//make sure random node is in the correct branch
-                        n_new = rand_btw(1,num_nodes,0);
-                    while(branchM[m_new]==0)
-                        m_new = rand_btw(1,num_nodes,0);
-                }
-                while(new_solution[n_new][m_new].weight ==0)//while edge is not possible, find another edge until a possible edge is found
-                {
-                    n_new = rand_btw(1,num_nodes,0);//select two random nodes
-                    m_new = rand_btw(1,num_nodes,n_new);
-                    while(branchN[n_new]==0)//make sure random node is in the correct branch
-                        n_new = rand_btw(1,num_nodes,0);
-                    while(branchM[m_new]==0)
-                        m_new = rand_btw(1,num_nodes,0);
-                    while((n==n_new && m==m_new)|| (n==m_new && m==n_new))//make sure the edge is not the same as the one just removed
-                    {
-                        goto here;
-                    }
-                }
-                if (source ==0)
-                {
-                    printf("\n Add Edge1 (%d %d)",n_new,m_new);
-                    new_solution[n_new][m_new].label= 1;//add this random edge to the solution
-                }
-                else
-                {
-                    printf("\n Add Edge2 (%d %d)",m_new,n_new);
-                    new_solution[m_new][n_new].label= 1;
-                }
-                edgeAdded = TRUE;
-            }
+            add_edge( source, branchN, branchM, num_nodes, new_solution,n,m );
 
-//*******************************************************************************************************************************
-            //REVERSE ORFER OF SECOND BRANCH - !!! CHECK THIS
-            for(x=1; x<=num_nodes; x++)
-                for(y=1; y<=num_nodes; y++)
-                {
-                    visited[x]=0;
-                }
+            //fix order of branches
+            for(x=1;x<=num_nodes;x++)
+                visited[x]=0;
+            dfs_swap( 1, num_nodes, new_solution, visited);
+            new_cost = cost(num_nodes, new_solution);//print out solution and total cost of new solution
 
-             new_cost = 0;
-             num_edges = 1;
-             weight =0;
-            if (source ==0)//branchN has the source node so look at branchM
-            {
-                dfs_swap( 1, num_nodes, new_solution, visited, weight);
-                printf("\n done swapping");
-                //cost
-            }
-            else//for all edges of the second branch (the one without the source node)
-            {
-                dfs_swap( 1, num_nodes, new_solution, visited, weight);
-                printf("\n done swapping");
-            }
+            //acceptance probability function
+            old_cost = acceptance_prob(T, old_cost, new_cost, new_solution, current_SA, fp, num_nodes);
 
-//************************************************************************************************************************************
-            for(x=1; x<=num_nodes; x++)
-                    visited[x]=0;
-
-            new_cost = 0;
-            num_edges = 1;//set number of edges back to default
-            for(x=1; x<=num_nodes; x++)//print out new_solution
-            {
-                weight =0;
-                for(y=1; y<=num_nodes; y++)
-                    if(new_solution[x][y].label == 1)
-                    {
-                            printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,new_solution[x][y].weight);
-                            if(weight<new_solution[x][y].weight)//find highest energy used per node
-                            {
-                                weight = new_solution[x][y].weight;
-                                printf("\n weigth:%d accum:%d",weight, new_cost);
-                            }
-                    }
-                new_cost += weight;//find total weight
-            }
-            printf("\n Total cost is %d\n\n", new_cost);
-
-                //acceptance probability function
-                delta = (old_cost-new_cost);
-                ap = (exp(delta/T)); //this is the typical equation used
-
-                if(new_cost < old_cost)//if new_solution has less energy select it
-                {
-                    fprintf(fp,"NO");
-                    for(x=1; x<=num_nodes; x++)
-                        for(y=1; y<=num_nodes; y++)
-                            current_SA[x][y] = new_solution[x][y];
-                    old_cost = new_cost;
-                }
-                else //if new_solution uses more energy maybe select it
-                {
-                    if (ap > rand_float())
-                    {
-                        fprintf(fp,"YES");
-                        for(x=1; x<=num_nodes; x++)
-                            for(y=1; y<=num_nodes; y++)
-                                current_SA[x][y] = new_solution[x][y];
-                        old_cost = new_cost;
-                    }
-                }
-
-            compare_process += 50;
             edgeAdded = FALSE;//reset value
             edgeRemoved = FALSE;//reset value
+            compare_process += 1;
         }
         //temperature decreases by a factor of alpha after each generation until the minimum temp is reached
         T = T*alpha;
-        compare_process += 1;
-       // = T++;
-        printf("T= %f",T);
     }
 
     printf("\n\n\n\n ****Final Solution is****");
