@@ -42,8 +42,11 @@ void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[]);//fo
 //main SA
 int *acceptance_prob(float T, int old_cost, int new_cost,edge new_solution[][10], edge current_SA[][10],FILE *fp, int num_nodes);
 int *cost(int num_nodes, edge new_solution[][10]);
-void *add_edge(int source,int  branchN[],int  branchM[],int num_nodes,edge new_solution[][10], int n, int m  );
+void *add_edge(int num_nodes,edge new_solution[][10], int n, int m );
+void *remove_edge(int num_nodes,edge new_solution[][10]);
 void *print_output_file(int iteration, int old_cost, int num_nodes,edge current_SA[][10],FILE *fp);
+void *temp_delete(edge new_solution[][10],int n,int m);
+int *check_deadend(int num_nodes,edge new_solution[][10] ,int n,int m );
 
 //initial SA setup
 void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge initial_SA[][10],edge temp[][10],edge current_SA[][10]);
@@ -146,7 +149,7 @@ int *cost(int num_nodes, edge new_solution[][10])
                     if(weight<new_solution[x][y].weight)//find highest energy used per node
                     {
                         weight = new_solution[x][y].weight;
-                        printf("\n weigth:%d accum:%d",weight, new_cost);
+                        //printf("\n weigth:%d accum:%d",weight, new_cost);
                     }
             }
         new_cost += weight;//find total weight
@@ -185,10 +188,15 @@ int *acceptance_prob(float T, int old_cost, int new_cost,edge new_solution[][10]
     return old_cost;
 }
 
-void *add_edge(int source,int  branchN[],int  branchM[],int num_nodes,edge new_solution[][10], int n, int m )
+void *add_edge(int num_nodes,edge new_solution[][10], int n, int m )
 {
-    int x,i,n_new,m_new;
+    int x,i;
+    int source;
+    int n_new,m_new;
     int edgeAdded=FALSE;
+    int visited[400]={0};
+    int branchN [400] = {0},branchM [400] = {0};
+
     //DFS function
     //find nodes in n branch using DFS
     while (edgeAdded==FALSE)//add edge between the two branches to make a complete tree
@@ -221,10 +229,12 @@ void *add_edge(int source,int  branchN[],int  branchM[],int num_nodes,edge new_s
         //select random node from each branch branchM and branchN
         n_new = rand_btw(1,num_nodes,0);//select two random nodes
         m_new = rand_btw(1,num_nodes,n_new);
+
         while(branchN[n_new]==0)//make sure random node is in the correct branch
             n_new = rand_btw(1,num_nodes,0);
         while(branchM[m_new]==0)
             m_new = rand_btw(1,num_nodes,0);
+
         while((n==n_new && m==m_new)|| (n==m_new && m==n_new))//make sure the edge is not the same as the one just removed
         {
             here:
@@ -235,10 +245,12 @@ void *add_edge(int source,int  branchN[],int  branchM[],int num_nodes,edge new_s
             while(branchM[m_new]==0)
                 m_new = rand_btw(1,num_nodes,0);
         }
+
         while(new_solution[n_new][m_new].weight ==0)//while edge is not possible, find another edge until a possible edge is found
         {
             n_new = rand_btw(1,num_nodes,0);//select two random nodes
             m_new = rand_btw(1,num_nodes,n_new);
+
             while(branchN[n_new]==0)//make sure random node is in the correct branch
                 n_new = rand_btw(1,num_nodes,0);
             while(branchM[m_new]==0)
@@ -248,6 +260,7 @@ void *add_edge(int source,int  branchN[],int  branchM[],int num_nodes,edge new_s
                 goto here;
             }
         }
+
         if (source ==0)
         {
             printf("\n Add Edge1 (%d %d)",n_new,m_new);
@@ -260,6 +273,97 @@ void *add_edge(int source,int  branchN[],int  branchM[],int num_nodes,edge new_s
         }
         edgeAdded = TRUE;
     }
+    //fix order of branches
+    dfs_swap( 1, num_nodes, new_solution, visited);
+}
+
+void *remove_edge(int num_nodes,edge new_solution[][10])
+{
+    int set;
+    int node[2];
+    int edgeRemoved =FALSE;
+    int deadend =FALSE;
+
+    while (edgeRemoved == FALSE)//remove a random edge
+    {
+        here2:
+        node[0] = rand_btw(1,num_nodes,0);//select two random nodes to remove the edge from
+        node[1] = rand_btw(1,num_nodes,node[0]);//node [0]=n, node[1] =m
+
+        while(new_solution[node[0]][node[1]].label ==0)//make sure that the edge is in the current solution.//while edge is not in solution, find another edge until solution edge is found. Note, if edge is in current solution then edge is also possible i.e. has a weight>0
+        {
+            node[0] = rand_btw(1,num_nodes,0);
+            node[1] = rand_btw(1,num_nodes,node[0]);//prevent picking the same node
+        }
+
+        //temporarily delete edge
+        set = temp_delete( new_solution, node[0], node[1]);
+
+        deadend = check_deadend(num_nodes,new_solution,node[0],node[1]);
+
+        while(deadend ==TRUE)//while delete branch is a deadend
+        {
+            if(set==0)
+                new_solution[node[1]][node[0]].label =1;
+            else
+               new_solution[node[0]][node[1]].label =1;   //undelete the branch
+            goto here2;
+        }
+        printf("\n Remove Edge (%d %d)",node[0],node[1]);
+        new_solution[node[0]][node[1]].label =new_solution[node[1]][node[0]].label= 0;//remove this random edge from the solution
+        edgeRemoved = TRUE;//this separates the tree into two branches
+    }
+    return node;
+}
+
+int *check_deadend(int num_nodes,edge new_solution[][10],int n,int m )
+{
+    int count1=0;//keep count of how many potential edges can be made of each branch
+    int count2=0;
+    int x,y;
+    int deadend = FALSE;
+    int branchN [400] = {0},branchM [400] = {0};
+
+    //delete edge only if it is not a dead end
+    for(x=1; x<=num_nodes; x++)//create storage space to list nodes in each branch
+    {
+        branchN[x]=0;
+        branchM[x]=0;
+    }
+
+    dfs(n,num_nodes,new_solution,branchN);
+    dfs(m,num_nodes,new_solution,branchM); //find nodes in n branch using DFS
+                //there has to be more than one possible edge for branch
+    for(x=1; x<=num_nodes; x++)
+        for(y=1; y<=num_nodes; y++) //for each edge from each branch
+        {
+            if(branchN[x]==1&&branchM[y]==1)//to the other branch
+                if(new_solution[x][y].weight !=0)//that is possible
+                    count1 ++;
+            if (branchM[x]==1&&branchN[y]==1)
+                if(new_solution[x][y].weight !=0)//that is possible
+                    count2 ++;
+        }
+    if (count1<2||count2<2)
+        deadend = TRUE;
+    return deadend;
+}
+
+void *temp_delete(edge new_solution[][10],int n,int m)
+{
+    int set;
+    if (new_solution[m][n].label ==1)
+    {
+        set = 0;
+        new_solution[m][n].label= 0;
+    }
+    if (new_solution[n][m].label ==1)
+    {
+        set=1;
+        new_solution[n][m].label= 0;
+    }
+    return set;
+
 }
 
 void *print_output_file(int iteration, int old_cost, int num_nodes,edge current_SA[][10], FILE *fp)
@@ -363,18 +467,19 @@ int main()
     int old_cost=0,new_cost=0;
 
     //set neighbour solution default setting
-    int source =0;
     int n,m;
+    int *node;
     int compare_process=1;
     int branchN [400] = {0},branchM [400] = {0};
-    int edgeRemoved = FALSE, edgeAdded = FALSE;
+    int edgeRemoved = FALSE;
 
     //declare and initialise other variables
-    int x,y,i=1;
+    int x,y;
     int iteration =1;
     int visited [400]= {0};
     int num_nodes =0,num_edges=1;
-    int count1 = 0, count2=0,set;
+    int set;
+    int deadend =FALSE;
 
     FILE *fp;
 
@@ -408,88 +513,20 @@ int main()
         compare_process=1;
 
         while (compare_process <= 100)//"neighbor-cost-compare-move process
-            //process is carried about many times (typically somewhere between 100 and 1,000) at each temperature"
-            //by http:katrinaeg.com/simulated-annealing.html
+            //process is carried about many times (typically somewhere between 100 and 1,000) at each temperature"by http:katrinaeg.com/simulated-annealing.html
         {
-            printf("\n\n Neighbor-cost-compare-move iteration: %d",i);
-
+            printf("\n\n Neighbor-cost-compare-move iteration: %d",compare_process);
             //neighbour function
-            //temperature decreases by a factor of alpha after each generation until the minimum temp is reached
             for(x=1; x<=num_nodes; x++)
                 for(y=1; y<=num_nodes; y++)
                     new_solution[x][y] = current_SA[x][y];
 
-            while (edgeRemoved == FALSE)//remove a random edge
-            {
-                here2:
-                n = rand_btw(1,num_nodes,0);//select two random nodes to remove the edge from
-                m = rand_btw(1,num_nodes,n);
+            node = remove_edge( num_nodes, new_solution);
+            add_edge( num_nodes, new_solution,*(node+0), *(node+1));
 
-                while(new_solution[n][m].label ==0)//make sure that the edge is in the current solution.//while edge is not in solution, find another edge until solution edge is found. Note, if edge is in current solution then edge is also possible i.e. has a weight>0
-                {
-                    n = rand_btw(1,num_nodes,0);
-                    m = rand_btw(1,num_nodes,n);//prevent picking the same node
-                }
-
-                //temporarily delete edge
-                if (new_solution[m][n].label ==1){
-                    set = 0;
-                    new_solution[m][n].label= 0;
-                }
-                if (new_solution[n][m].label ==1)
-                {
-                    set=1;
-                    new_solution[n][m].label= 0;
-                }
-
-                //delete edge only if it is not a dead end
-                 for(x=1; x<=num_nodes; x++)//create storage space to list nodes in each branch
-                {
-                    branchN[x]=0;
-                    branchM[x]=0;
-                }
-                dfs(n,num_nodes,new_solution,branchN);
-                dfs(m,num_nodes,new_solution,branchM); //find nodes in n branch using DFS
-                //there has to be more than one possible edge for branch
-                count1=0;//keep count of how many potential edges can be made of each branch
-                count2=0;
-
-                for(x=1; x<=num_nodes; x++)
-                    for(y=1; y<=num_nodes; y++) //for each edge from each branch
-                    {
-                        if(branchN[x]==1&&branchM[y]==1)//to the other branch
-                            if(new_solution[x][y].weight !=0)//that is possible
-                                count1 ++;
-                        if (branchM[x]==1&&branchN[y]==1)
-                            if(new_solution[x][y].weight !=0)//that is possible
-                                count2 ++;
-                    }
-
-                while((count1<2)||(count2<2))//while delete branch is a deadend
-                      {
-                          if(set==0)
-                          new_solution[m][n].label =1;
-                          else
-                           new_solution[n][m].label =1;   //undelete the branch
-                          goto here2;
-                      }
-                printf("\n Remove Edge (%d %d)",n,m);
-                new_solution[n][m].label =new_solution[m][n].label= 0;//remove this random edge from the solution
-                edgeRemoved = TRUE;//this separates the tree into two branches
-            }
-
-            add_edge( source, branchN, branchM, num_nodes, new_solution,n,m );
-
-            //fix order of branches
-            for(x=1;x<=num_nodes;x++)
-                visited[x]=0;
-            dfs_swap( 1, num_nodes, new_solution, visited);
             new_cost = cost(num_nodes, new_solution);//print out solution and total cost of new solution
-
             //acceptance probability function
             old_cost = acceptance_prob(T, old_cost, new_cost, new_solution, current_SA, fp, num_nodes);
-
-            edgeAdded = FALSE;//reset value
             edgeRemoved = FALSE;//reset value
             compare_process += 1;
         }
@@ -497,14 +534,6 @@ int main()
         T = T*alpha;
     }
 
-    printf("\n\n\n\n ****Final Solution is****");
-    for(x=1; x<=num_nodes; x++)
-    {
-        printf("\n node %d:",x);
-        for(y=1; y<=num_nodes; y++)
-            printf(" %d",current_SA[x][y].label);
-    }
-
-    printf("\n Total cost is %d\n\n", old_cost);
+    old_cost = cost( num_nodes, current_SA);//print solution and cost
     return 0;
 }
