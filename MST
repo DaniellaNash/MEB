@@ -6,6 +6,12 @@
 #define MAX_TX_DISTANCE 999
 #define MAX_ARRAY_SIZE 10
 
+typedef struct Edge
+{
+    int **distance;//weight from 2 nodes
+    int **label;//if edge exist between the two nodes
+} edge;
+
 int get_num_nodes(void);
 void display (int display, int min_energy);
 
@@ -27,55 +33,112 @@ void display (int display, int min_energy)
 
 int main()
 {
-    int x,y,i,j,n;
-    int visited [400]={0};//set all nodes to not visited
-    int distance[400][400];//nodes
+    int x,y,i,j;
+    int* visited;//set all nodes to not visited
+    int** temp;
     int min_energy=0,energy=999;
     int num_nodes,num_edges=1;
+    int weight =0;
+
+    FILE *fp;
+
+    //creating new file with write mode
+    fp=fopen("testSA.txt","w");
+    if(fp==NULL)
+    {
+        printf("Error!");
+        exit(1);
+    }
+    fprintf(fp,"%s %s\t%s\n" ,"Total","Energy","Solution");
 
     display(0,0);
+    edge solution;
+
+
     num_nodes = get_num_nodes();
+
+    visited = (int *)malloc(num_nodes * sizeof(int));
+
+    temp = malloc(num_nodes * sizeof(int*));//used to store original weight of edges
+
+    solution.distance =malloc(num_nodes * sizeof(int*));//pointer to pointer for 2d array memory allocation
+    solution.label =malloc(num_nodes * sizeof(int*));
+
+    if(visited == NULL||solution.distance == NULL||solution.label == NULL||temp == NULL)
+        fprintf(fp,"ERROR: Memory allocation failed!");
+
+    for(i=1; i<=num_nodes; i++)
+    {
+        temp[i] = malloc(num_nodes * sizeof(int));
+        solution.distance[i] = malloc(num_nodes * sizeof(int));
+        solution.label[i] = malloc(num_nodes * sizeof(int));
+        if(solution.distance[i] == NULL||solution.label[i] == NULL||temp[i] == NULL)
+            fprintf(fp,"ERROR: Memory allocation failed!");
+    }
 
     //ask for the distance needed of each edge the node takes and store them
     printf("\nEnter the network topology matrix:\n");
     for(i=1; i<=num_nodes; i++)
         for(j=1; j<=num_nodes; j++)
         {
-            scanf("%d",&distance[i][j]);
-            if(distance[i][j]==0)
-                distance[i][j]=MAX_TX_DISTANCE;//set non-existing edges to a large number (infinity) to prevent being selected
+            scanf("%d",&solution.distance[i][j]);
+            if(solution.distance[i][j]==0)
+                solution.distance[i][j]=MAX_TX_DISTANCE;//set non-existing edges to a large number (infinity) to prevent being selected
+            solution.label[i][j]=0;//solution starts with no tree (edges)
         }
+
+    for(i=1; i<=num_nodes; i++)//store distance data to temp
+        for(j=1; j<=num_nodes; j++)
+            temp[i][j]=solution.distance[i][j];
+
     visited[1]=1;//starting node
 
     while(num_edges < num_nodes)//for each edge of MST (MST number of edges should = number of nodes -1)
     {
         for(i=1, energy =999; i<=num_nodes; i++)//for each node to node edge
             for(j=1; j<=num_nodes; j++)
-                if(distance[i][j]< energy)//check if the energy is not exceeding tx range i.e. edge exists
-                    if(visited[i]!=0)            //and if the node is visited
+                if(solution.distance[i][j]< energy)//check if the energy is not exceeding tx range i.e. edge exists
+                    if(visited[i]!=0)            //and if the first node is visited
                     {
-                        energy = distance[i][j];  //then select that edge and compute the energy
+                        energy = solution.distance[i][j];  //then select that edge and compute the energy
                         x=i;
                         y=j;
                     }
         if(visited[x]==0 || visited[y]==0)//if either one of the node is not visited
         {
-            min_energy += energy;// find highest energy of each node (not including its previous) and sum them for the total power
-            visited[y]=1; //mark both nodes of the edge as visited
-
-            for(n=1; n<=num_nodes; n++)
-                if(n!=y)
-                    if(distance[x][n]<= energy)// node can reach all other nodes with equal or lower tx power
-                    {
-                        visited[n]=1;
-                        printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,n,energy); //then
-                    }
             printf("\n Edge %d:(%d %d) energy:%d",num_edges++,x,y,energy); //then
+            min_energy += energy;
+            visited[y]=1; //mark both nodes of the edge as visited
+            solution.label[x][y] =1 ;//edge is used
+            for(i=1; i<=num_nodes;i++)
+                if(solution.distance[x][i]< energy)//all nodes within tx range used is also visited
+                {
+                    visited[i]=1;
+                    solution.label[x][i]=1;
+                }
         }
-        distance[x][y]=distance[y][x]=MAX_TX_DISTANCE;//make sure this edge is not selected again
-        distance[x][n]=distance[n][x]=MAX_TX_DISTANCE;//make sure this edge is not selected again
+        solution.distance[x][y]=solution.distance[y][x]=MAX_TX_DISTANCE;//make sure this edge is not selected agai
     }
+    min_energy =0;
+    for(i=1; i<=num_nodes; i++)//for each node to node edge
+        {
+            weight = 0;
+            for(j=1; j<=num_nodes; j++)
+                if (solution.label[i][j]==1)
+                {
+                    printf("\n%d -> %d: weight: %d",i,j,temp[i][j] );
+                    if(weight<temp[i][j])//find highest energy used per node
+                    {
+                        weight = temp[i][j];
+                    }
+                }
+
+             min_energy += weight;
+        }
 
     display(1,min_energy);
     return 0;
 }
+
+// find highest energy of each node (not including its previous) and sum them for the total power
+// node can reach all other nodes with equal or lower tx power
