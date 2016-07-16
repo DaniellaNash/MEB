@@ -37,24 +37,24 @@ int rand_btw(int Min, int Max,int not_including);//random number between
 float rand_float(void);//between 0 and 1
 
 //tree traversal
-void *dfs(int v, int num_nodes,edge new_solution[][10], int visited[]);//for identifying which nodes are in which branch
-void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[]);//for fixing node/edge ancestry
+void *dfs(int v, int num_nodes,edge** new_solution , int visited[]);//for identifying which nodes are in which branch
+void *dfs_swap(int v, int num_nodes, edge** new_solution ,int visited[]);//for fixing node/edge ancestry
 
 //main SA
-int acceptance_prob(float T, int old_cost, int new_cost,edge new_solution[][10], edge current_SA[][10],FILE *fp, int num_nodes);
-int cost(int num_nodes, edge new_solution[][10]);
-void *add_edge(int num_nodes,edge new_solution[][10], int n, int m );
-void *neighbour_solution(int num_nodes,edge new_solution[][10]);
-void *print_output_file(int iteration, int old_cost, int num_nodes,edge current_SA[][10],FILE *fp);
-int temp_delete(edge new_solution[][10],int n,int m);
-int check_deadend(int num_nodes,edge new_solution[][10] ,int n,int m );
+int acceptance_prob(float T, int old_cost, int new_cost,edge** new_solution , edge** current_SA ,FILE *fp, int num_nodes);
+int cost(int num_nodes, edge** new_solution );
+void *add_edge(int num_nodes,edge** new_solution , int n, int m, FILE *fp);
+void *neighbour_solution(int num_nodes,edge** new_solution ,FILE *fp);
+void *print_output_file(int iteration, int old_cost, int num_nodes,edge** current_SA ,FILE *fp);
+int temp_delete(edge** new_solution ,int n,int m);
+int check_deadend(int num_nodes,edge** new_solution  ,int n,int m ,FILE *fp);
 
 //initial SA setup
-void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge initial_SA[][10],edge temp[][10],edge current_SA[][10]);
-void *get_network_topology( int num_nodes, edge initial_SA[][10], edge temp[][10],int visited[]);
+void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge** initial_SA,edge** temp ,edge** current_SA );
+void *get_network_topology( int num_nodes, edge **initial_SA, edge** temp ,int visited[]);
 int get_num_nodes(void);
 
-void *dfs(int v, int num_nodes, edge new_solution[][10],int visited[])
+void *dfs(int v, int num_nodes, edge** new_solution ,int visited[])
 {
     int i;
 
@@ -66,7 +66,7 @@ void *dfs(int v, int num_nodes, edge new_solution[][10],int visited[])
     return 0;
 }
 
-void *dfs_swap(int v, int num_nodes, edge new_solution[][10],int visited[])
+void *dfs_swap(int v, int num_nodes, edge** new_solution ,int visited[])
 {
     int i;
 
@@ -134,7 +134,7 @@ float rand_float(void)
     return random;
 }
 
-int cost(int num_nodes, edge new_solution[][10])
+int cost(int num_nodes, edge** new_solution )
 {
     int new_cost = 0;
     int num_edges = 1;//set number of edges back to default
@@ -159,7 +159,7 @@ int cost(int num_nodes, edge new_solution[][10])
     return new_cost;
 }
 
-int acceptance_prob(float T, int old_cost, int new_cost,edge new_solution[][10], edge current_SA[][10],FILE *fp, int num_nodes )
+int acceptance_prob(float T, int old_cost, int new_cost,edge** new_solution , edge** current_SA ,FILE *fp, int num_nodes )
 {
     int delta=0 ,x,y;
     float ap = 0.0;
@@ -192,7 +192,7 @@ int acceptance_prob(float T, int old_cost, int new_cost,edge new_solution[][10],
     return cost;
 }
 
-void *add_edge(int num_nodes,edge new_solution[][10], int n, int m )
+void *add_edge(int num_nodes,edge** new_solution , int n, int m ,FILE *fp)
 {
     int x,i;
     int source;
@@ -204,6 +204,8 @@ void *add_edge(int num_nodes,edge new_solution[][10], int n, int m )
     branchN = (int *)malloc(num_nodes * sizeof(int));
     branchM = (int *)malloc(num_nodes * sizeof(int));
     visited = (int *)malloc(num_nodes * sizeof(int));
+    if (branchM==NULL||branchN==NULL||visited==NULL)
+        fprintf(fp,"\nError allocating memory!\n"); //print an error message
 
     //DFS function
     //find nodes in n branch using DFS
@@ -287,7 +289,7 @@ void *add_edge(int num_nodes,edge new_solution[][10], int n, int m )
     return 0;
 }
 
-void *neighbour_solution(int num_nodes,edge new_solution[][10])
+void *neighbour_solution(int num_nodes,edge** new_solution ,FILE *fp)
 {
     int set;
     int n,m;
@@ -310,7 +312,7 @@ void *neighbour_solution(int num_nodes,edge new_solution[][10])
         //temporarily delete edge
         set = temp_delete( new_solution, n, m);
 
-        deadend = check_deadend(num_nodes,new_solution,n,m);
+        deadend = check_deadend(num_nodes,new_solution,n,m,fp);
 
         while(deadend ==TRUE)//while delete branch is a deadend
         {
@@ -326,11 +328,11 @@ void *neighbour_solution(int num_nodes,edge new_solution[][10])
     }
 
     //connect the two branches back together to make the solution tree
-    add_edge( num_nodes, new_solution,n, m);
+    add_edge( num_nodes, new_solution,n, m,fp);
     return 0;
 }
 
-int check_deadend(int num_nodes,edge new_solution[][10],int n,int m )
+int check_deadend(int num_nodes,edge** new_solution ,int n,int m ,FILE *fp)
 {
     int count1=0;//keep count of how many potential edges can be made of each branch
     int count2=0;
@@ -340,6 +342,8 @@ int check_deadend(int num_nodes,edge new_solution[][10],int n,int m )
 
     branchN = (int *)malloc(num_nodes * sizeof(int));
     branchM = (int *)malloc(num_nodes * sizeof(int));
+    if (branchM==NULL||branchN==NULL)
+        fprintf(fp,"\nError allocating memory!\n"); //print an error message
 
     //delete edge only if it is not a dead end
     for(x=1; x<=num_nodes; x++)//create storage space to list nodes in each branch
@@ -366,7 +370,7 @@ int check_deadend(int num_nodes,edge new_solution[][10],int n,int m )
     return deadend;
 }
 
-int temp_delete(edge new_solution[][10],int n,int m)
+int temp_delete(edge** new_solution ,int n,int m)
 {
     int set;
     if (new_solution[m][n].label ==1)
@@ -383,7 +387,7 @@ int temp_delete(edge new_solution[][10],int n,int m)
 
 }
 
-void *print_output_file(int iteration, int old_cost, int num_nodes,edge current_SA[][10], FILE *fp)
+void *print_output_file(int iteration, int old_cost, int num_nodes,edge** current_SA , FILE *fp)
 {
     int x,y;
 
@@ -395,7 +399,7 @@ void *print_output_file(int iteration, int old_cost, int num_nodes,edge current_
     return 0;
 }
 
-void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge initial_SA[][10],edge temp[][10],edge current_SA[][10])
+void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge** initial_SA ,edge** temp ,edge** current_SA )
 {
     int x,y,rand,n;
 
@@ -441,7 +445,7 @@ void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge initial
     return 0;
 }
 
-void *get_network_topology( int num_nodes, edge initial_SA[][10], edge temp[][10], int visited[])
+void *get_network_topology( int num_nodes, edge **initial_SA, edge** temp , int visited[])
 {
     int x,y;
     //ask for the energy needed of each edge the node takes and store them
@@ -505,12 +509,35 @@ int main()
             "Energy","Solution");
 
     num_nodes = get_num_nodes();
-    edge initial_SA[10][10];
-    edge current_SA[10][10];
-    edge new_solution[10][10];
-    edge temp[10][10];
+    edge** initial_SA;
+    edge** current_SA;
+    edge** new_solution;
+    edge** temp;
+
+    initial_SA = malloc(num_nodes * sizeof(edge*));
+    current_SA = malloc(num_nodes * sizeof(edge*));
+    new_solution = malloc(num_nodes * sizeof(edge*));
+    temp = malloc(num_nodes * sizeof(edge*));
+    if(initial_SA == NULL||current_SA == NULL||new_solution == NULL||temp == NULL)
+    {
+        fprintf(fp,"ERROR: Memory allocation failed!");
+    }
+    for(x = 1; x <= num_nodes; x++)
+    {
+        initial_SA[x] = malloc(num_nodes * sizeof(edge));
+        current_SA[x] = malloc(num_nodes * sizeof(edge));
+        new_solution[x] = malloc(num_nodes * sizeof(edge));
+        temp[x] = malloc(num_nodes * sizeof(edge));
+
+        if(initial_SA[x] == NULL||current_SA[x] == NULL||new_solution[x] == NULL||temp[x] == NULL)
+        {
+            fprintf(fp,"ERROR: Memory allocation failed!");
+        }
+    }
 
     visited = (int *)malloc(num_nodes * sizeof(int));
+    if (visited==NULL)
+        fprintf(fp,"\nError allocating memory!\n"); //print an error message
 
     get_network_topology(num_nodes,initial_SA,temp,visited);//get network topology
     gen_init_solution(num_edges, num_nodes, visited,initial_SA, temp, current_SA);//generate initial random solution (TREE MST - no loops)
@@ -534,7 +561,7 @@ int main()
                 for(y=1; y<=num_nodes; y++)
                     new_solution[x][y] = current_SA[x][y];
 
-            neighbour_solution( num_nodes, new_solution);
+            neighbour_solution( num_nodes, new_solution,fp);
 
             new_cost = cost(num_nodes, new_solution);//print out solution and total cost of new solution
             //acceptance probability function
