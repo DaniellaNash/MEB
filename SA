@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 #define MAX_NUM_NODE 100
 #define MAX_ENERGY 0
 #define FALSE 0
@@ -43,15 +44,17 @@ void *dfs_swap(int v, int num_nodes, edge** new_solution ,int visited[]);//for f
 //main SA
 int acceptance_prob(float T, int old_cost, int new_cost,edge** new_solution , edge** current_SA ,FILE *fp, int num_nodes);
 int cost(int num_nodes, edge** new_solution );
-void *add_edge(int num_nodes,edge** new_solution , int n, int m, FILE *fp);
-void *neighbour_solution(int num_nodes,edge** new_solution ,FILE *fp);
 void *print_output_file(int iteration, int old_cost, int num_nodes,edge** current_SA ,FILE *fp);
+
 int temp_delete(edge** new_solution ,int n,int m);
 int check_deadend(int num_nodes,edge** new_solution  ,int n,int m ,FILE *fp);
+void *add_edge(int num_nodes,edge** new_solution , int n, int m, FILE *fp);
+void *neighbour_solution(int num_nodes,edge** new_solution ,FILE *fp);
 
 //initial SA setup
 void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge** initial_SA,edge** temp ,edge** current_SA );
 void *get_network_topology( int num_nodes, edge **initial_SA, edge** temp ,int visited[]);
+int *generate_rand_matrix(int num_nodes, edge **initial_SA, edge** temp , int visited[]);
 int get_num_nodes(void);
 
 void *dfs(int v, int num_nodes, edge** new_solution ,int visited[])
@@ -448,14 +451,16 @@ void *gen_init_solution(int num_edges, int num_nodes, int visited[],edge** initi
 void *get_network_topology( int num_nodes, edge **initial_SA, edge** temp , int visited[])
 {
     int x,y;
+    int distance;
     //ask for the energy needed of each edge the node takes and store them
     printf("\nEnter the network topology matrix:\n");
     for(x=1; x<=num_nodes; x++)
         for(y=1; y<=num_nodes; y++)
         {
-            scanf("%d",&initial_SA[x][y].weight);//Note that 0 = out of tx range of the node
+            scanf("%d",&distance);//Note that 0 = out of tx range of the node
+            if (distance !=0)
+                initial_SA[x][y].weight = pow(distance,2);
         }
-
 
     for(x=1; x<=num_nodes; x++)
         for(y=1; y<=num_nodes; y++)
@@ -468,6 +473,43 @@ void *get_network_topology( int num_nodes, edge **initial_SA, edge** temp , int 
     visited[1]=1;//set node one as the source node
     return 0;
 
+}
+//not working
+int *generate_rand_matrix(int num_nodes, edge **initial_SA, edge** temp , int visited[])
+{
+    int x,y;
+    //ask for the energy needed of each edge the node takes and store them
+    printf("\nEnter the network topology matrix:\n");
+    for(x=1; x<=num_nodes; x++)
+        for(y=1; y<=num_nodes; y++)
+        {
+            initial_SA[x][y].weight= rand()%10;//rand from 0 to 100
+            if(rand_binary()==1)
+                initial_SA[x][y].weight=0;
+        }
+    for(x=1; x<=num_nodes; x++)
+        for(y=1; y<=num_nodes; y++)
+        {
+            initial_SA[x][y].weight= initial_SA[y][x].weight;//rand from 0 to 100
+            if (x==y||y==x)
+                initial_SA[y][x].weight=0;
+        }
+
+    for(x=1; x<=num_nodes; x++)
+    {
+        printf("\n");
+        for(y=1; y<=num_nodes; y++)
+        {
+            temp[x][y].weight = initial_SA[x][y].weight;//store data of weights as initial_SA.weight will be modified temporarily for calculations
+            initial_SA[x][y].label =0;//initially start with no tree
+            visited[x]=0;//no nodes visited at the start
+            printf(" %d",initial_SA[x][y].weight);
+        }
+    }
+
+
+    visited[1]=1;//set node one as the source node
+    return 0;
 }
 
 int get_num_nodes(void)
@@ -508,6 +550,8 @@ int main()
     fprintf(fp,"%s %s\t%s %s\t%s\n" ,"Iteration","number","Total",
             "Energy","Solution");
 
+    srand(time(NULL));// refresh random values at every execution
+
     num_nodes = get_num_nodes();
     edge** initial_SA;
     edge** current_SA;
@@ -539,7 +583,8 @@ int main()
     if (visited==NULL)
         fprintf(fp,"\nError allocating memory!\n"); //print an error message
 
-    get_network_topology(num_nodes,initial_SA,temp,visited);//get network topology
+    get_network_topology(num_nodes,initial_SA,temp,visited);//get network
+    //generate_rand_matrix( num_nodes,initial_SA,temp , visited);
     gen_init_solution(num_edges, num_nodes, visited,initial_SA, temp, current_SA);//generate initial random solution (TREE MST - no loops)
     old_cost = cost( num_nodes, current_SA);//print solution and cost
 
