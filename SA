@@ -6,6 +6,7 @@
 #include <time.h>
 #define MAX_NUM_NODE 100
 #define MAX_ENERGY 0
+#define MAX_DISTANCE 200
 #define FALSE 0
 #define TRUE 1
 
@@ -458,8 +459,11 @@ void *get_network_topology( int num_nodes, edge **initial_SA, edge** temp , int 
         for(y=1; y<=num_nodes; y++)
         {
             scanf("%d",&distance);//Note that 0 = out of tx range of the node
-            if (distance !=0)
+            if (distance !=0&& distance < MAX_DISTANCE)
                 initial_SA[x][y].weight = pow(distance,2);
+            else
+                initial_SA[x][y].weight = 0;
+
         }
 
     for(x=1; x<=num_nodes; x++)
@@ -562,6 +566,7 @@ int main()
     current_SA = malloc(num_nodes * sizeof(edge*));
     new_solution = malloc(num_nodes * sizeof(edge*));
     temp = malloc(num_nodes * sizeof(edge*));
+
     if(initial_SA == NULL||current_SA == NULL||new_solution == NULL||temp == NULL)
     {
         fprintf(fp,"ERROR: Memory allocation failed!");
