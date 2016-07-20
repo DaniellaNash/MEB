@@ -34,7 +34,7 @@ typedef struct Chrom
 
 } chrom;   // a chrom type
 
-void intro_objective_function (void);
+void introduction (void);
 int generate_rand(int Min, int Max);
 float generate_rand_float(void);
 int get_restart(void);
@@ -51,11 +51,11 @@ int get_selection_strategy(void);
 int get_crossover_strategy(void);
 int get_mutation_strategy(void);
 
-void *item_data(int num_nodes);
-float total_value(chrom ***next_population, int num_nodes);
-float cost(chrom ***next_population, int num_nodes,int i);
-float Objective_function(chrom ***next_population, int num_nodes,int i);
-void *binary_population(chrom ***current_population,int pop_size, int num_nodes);
+void get_network_topology(int num_nodes, int pop_size, int visited[], chrom *temp, chrom *current_population);
+void gen_init_pop(int num_nodes, int pop_size, int visited[], chrom *temp, chrom *current_population);
+float cost(int num_nodes,int i,chrom *next_population);
+float Objective_function(int num_nodes,int i,chrom *next_population);
+void print_out_chroms(int num_nodes,chrom* next_population, int j, int best, int current_generation);
 
 //select strategy for each operator
 void *do_selection_operator(int selection,chrom ***next_population,int num_nodes, int pop_size);
@@ -95,7 +95,6 @@ int main()
     float weight;
     int num_edges =1;
     int* visited;
-    float* cost;
 
     FILE *fp;
 
@@ -113,7 +112,7 @@ int main()
 
     do
     {
-        intro_objective_function (); //introduction plus the objective function declaration
+        introduction (); //introduction plus the objective function declaration
         num_gen = get_num_generation();        // get the stopping criterion
         pop_size = get_population_size();
         num_nodes = get_chromosome_size();  //get number of edges = number of nodes - 1
@@ -141,7 +140,7 @@ int main()
             current_population[x].gene = malloc(num_nodes * sizeof(edge*));
             next_population[x].gene = malloc(num_nodes * sizeof(edge*));
             if(current_population[x].gene == NULL||next_population[x].gene == NULL)
-                    fprintf(fp,"ERROR: Memory allocation failed!");
+                fprintf(fp,"ERROR: Memory allocation failed!");
 
             for(y = 1; y <= num_nodes; y++)
             {
@@ -151,74 +150,9 @@ int main()
                     fprintf(fp,"ERROR: Memory allocation failed!");
             }
         }
-
-        //ask for the energy needed of each edge the node takes and store them
-        printf("\nEnter the network topology matrix:\n");
-        for(i=1;i<=pop_size;i++)
-            for(x=1; x<=num_nodes; x++)
-                for(y=1; y<=num_nodes; y++)
-                {
-                    scanf("%f", &distance);
-                    current_population[i].gene[x][y].weight = distance;
-                }
-        for(i=1;i<=pop_size;i++)
-            for(x=1; x<=num_nodes; x++)
-                for(y=1; y<=num_nodes; y++)
-                {
-                    temp[i].gene[x][y].weight = current_population[i].gene[x][y].weight;//store data of weights as initial_SA.weight will be modified temporarily for calculations
-                    current_population[i].gene[x][y].label =0;//initially start with no tree
-                    visited[x]=0;//no nodes visited at the start
-                }
-        visited[1]=1;//set node one as the source node
-
-    printf("\n\n\t Initial population");
-    //make random solutions for initial populations
-    for(i=1;i<=pop_size;i++)//for each chromosome
-
-    {
-        for(j=2;j<=num_nodes;j++)//for each solution clear the visited list (j=2 as visited list must have 1 in the first slot to indicate source node)
-            visited[j]=0;
-        while(num_edges < num_nodes)//have required #edges = #node-1
-        {
-            for(x=1; x<=num_nodes; x++)
-                for(y=1; y<=num_nodes; y++)//for all edges
-                    if(visited[x]!=0)//if node is visited
-                        if(current_population[i].gene[x][y].weight!=MAX_ENERGY) //if edge is possible
-                            if(visited[y]==0)//if node is not yet visited
-                            {
-                                rand = rand_binary();
-                                current_population[i].gene[x][y].label=rand;//randomly add an edge
-                                if (rand == 1)
-                                {
-                                    visited [y] = 1;
-                                    printf("\n Edge1 %d:(%d %d) energy:%.1f, label:%d",num_edges++,x,y,current_population[i].gene[x][y].weight,current_population[i].gene[x][y].label);
-                                    for(n=1; n<=num_nodes; n++)
-                                        if(n!=y)//find different edge connected to node x
-                                            if (current_population[i].gene[x][n].weight != MAX_ENERGY)//if edge is possible
-                                                if(current_population[i].gene[x][n].weight<= current_population[i].gene[x][y].weight)// node can reach all other nodes with equal or lower tx power
-                                                    if(visited[n]==0)//if node is not yet visited
-                                                    {
-                                                        visited[n]=1;
-                                                        current_population[i].gene[x][n].label = 1;
-                                                        printf("\n Edge2 %d:(%d %d) energy:%.1f, label:%d",num_edges++,x,n,current_population[i].gene[x][n].weight,current_population[i].gene[x][n].label);
-                                                        current_population[i].gene[x][n].weight=current_population[i].gene[n][x].weight=MAX_ENERGY;//make sure same edge is not chosen twice
-                                                    }
-                                    current_population[i].gene[x][y].weight=current_population[i].gene[y][x].weight=MAX_ENERGY;//make sure same edge is not chosen twice
-                                }
-                            }
-        }
-
-    }
-
-        //transfer original weight back
-        for(i=1;i<=pop_size;i++)
-            for(x=1; x<=num_nodes; x++)
-                for(y=1; y<=num_nodes; y++)
-                    current_population[i].gene[x][y].weight = temp[i].gene[x][y].weight;
-
 //*************************************************************************************************************
-//        binary_population(current_population,pop_size,num_nodes); //binary representation
-//        item_data(num_nodes,edge_energy);
+        get_network_topology( num_nodes, pop_size, visited, temp, current_population);//get the matrix of node connections
+        gen_init_pop(num_nodes, pop_size, visited, temp,current_population);//generate random population of solution
 //*************************************************************************************************************
         for(current_generation=1; current_generation<num_gen+1 ; current_generation++) // iterate for the number of generations wanted
         {
@@ -227,57 +161,17 @@ int main()
             for(j=1; j<=pop_size; j++)
             {
                 next_population[j]=current_population[j];//copy current population to next population in order to adjust it
+                print_out_chroms( num_nodes,next_population,j,0,current_generation);
 
-                printf("\n Chromosome[%d] = ",j);
-                for(x=1; x<=num_nodes; x++)
-                {
-                    printf("\n Node %d:",x );
-                    for(y=1; y<=num_nodes; y++)
-                        printf(" %d",next_population[j].gene[x][y].label);
-                }
-
-//*************************************************************************************************************
-//                cost function inside --> next_population[j].fitness_score = Objective_function(next_population,num_nodes,j); //fitness score of chromosome
-//*************************************************************************************************************
-               new_cost = 0.0;
-                for(x=1; x<=num_nodes; x++)//for all edges
-                {
-                    weight =0.0;//find the largest tx on each node
-                    for(y=1; y<=num_nodes; y++)
-                        if(next_population[j].gene[x][y].label == 1)
-                                if(weight<next_population[j].gene[x][y].weight)//find highest energy used per node
-                                    weight = next_population[j].gene[x][y].weight;
-
-                    new_cost += weight;//find total weight
-                }
-                printf("\n Total cost is %.2f", new_cost);
-
-//*************************************************************************************************************
-//                next_population[j].fitness_score = Objective_function(next_population,num_nodes,j); //fitness score of chromosome
-                next_population[j].fitness_score = new_cost; //temporary
-//*************************************************************************************************************
-
-                printf("\n fitness=%.2f",next_population[j].fitness_score); // print the fitness and value of chromosome for each respective chromosome
+                next_population[j].fitness_score = Objective_function(num_nodes,j,next_population); //calculate fitness score of chromosome
+                printf("\n Fitness=%.2f",next_population[j].fitness_score); // print the fitness and value of chromosome for each respective chromosome
             }
 //*****************************************************UNCOMMENT THESE LATER***********************************
 //            selection_elitism_sort(pop_size, next_population,  num_nodes, show, edge_energy);
-//            sum_energy = cost(next_population[1],num_nodes,edge_energy);
-//            fprintf(fp,"\n\t\t%i\t\t\t%f\t\t%f\t\t",current_generation,cost[1],sum_energy );
-
 //*************************************************************************************************************
-
-            printf("\n\n\t\tbest chromosome of gen %d: ", current_generation);
-            for(x=1; x<=num_nodes; x++)
-            {
-                printf("\n\t Node %d:",x );
-                for(y=1; y<=num_nodes; y++)
-                {
-                    fprintf(fp,"%d",next_population[1].gene[x][y].label);
-                    printf(" %d",next_population[1].gene[x][y].label);
-                   // printf(" %.2f",next_population[j].gene[x][y].weight);
-                }
-            }
-
+            sum_energy = cost(num_nodes,1,next_population);
+            fprintf(fp,"\n\t%i\t\t%.1f\t\t\t%.1f\t\t",current_generation,next_population[1].fitness_score,sum_energy);
+            print_out(num_nodes,next_population,j,1,current_generation);
 
 //*****************************************************UNCOMMENT THESE LATER***********************************
 //            //selection function
@@ -288,9 +182,7 @@ int main()
 //            do_mutation_operator(mutation,next_population,num_nodes,pop_size, mutation_rate, edge_energy);
 //*************************************************************************************************************
             for(i=1; i<=pop_size; i++)
-            {
                 current_population[i]=next_population[i]; //copy the chromes of next population to current population
-            }
         }
         restart = get_restart();
     }
@@ -483,149 +375,149 @@ int main()
 //***********************************************************************************************************************
 //***********************************************************************************************************************
 //***********************************************************************************************************************
+void print_out_chroms(int num_nodes,chrom* next_population, int j, int best, int current_generation)
+{
+    int x,y;
+    if (best == TRUE)
+    {
+        printf("\n\n\t\tBest chromosome of Gen %d: ", current_generation);
+        for(x=1; x<=num_nodes; x++)
+        {
+            printf("\n\t Node %d:",x );
+            fprintf(fp,".");
+            for(y=1; y<=num_nodes; y++)
+            {
+                fprintf(fp,"%d",next_population[1].gene[x][y].label);
+                printf(" %d",next_population[1].gene[x][y].label);
+            }
+        }
+    }
+    else
+    {
+        printf("\n Chromosome[%d] = ",j);
+        for(x=1; x<=num_nodes; x++)
+        {
+            printf("\n Node %d:",x );
+            for(y=1; y<=num_nodes; y++)
+                printf(" %d",next_population[j].gene[x][y].label);
+        }
+    }
+}
 
+void gen_init_pop(int num_nodes, int pop_size, int visited[], chrom *temp, chrom *current_population)
+{
+    int num_edges=1;
+    int rand;
+    int i,j, x,y,n;
+    printf("\n\n\t Initial population");
+    //make random solutions for initial populations
+    for(i=1; i<=pop_size; i++) //for each chromosome
+    {
+        for(j=1; j<=num_nodes; j++) //for each solution clear the visited list
+            visited[j]=0;
 
-//void *binary_population(chrom ***current_population,int pop_size, int num_nodes)
-//{
-//    // create population
-//    int j,i;
-//    int random;
-//    int visited[10]={0};
-//    int num_edges  =0;
-//    int x,y,rand,n;
-//
-//    for(j=1; j<pop_size+1; j++) // for each chromosome
-//    {
-//        num_edges =1;
-//
-//        for(x=1;x<=num_nodes;x++)
-//            visited[x]=0;
-//
-//        while(num_edges < num_nodes)//have required #edges = #node-1
-//        {
-//            for(x=1; x<=num_nodes; x++)
-//                for(y=1; y<=num_nodes; y++)//for all edges
-//                    if(visited[x]!=0)//if node is visited
-//                        if(initial_SA[x][y].weight!=MAX_ENERGY) //if edge is possible
-//                            if(visited[y]==0)//if node is not yet visited
-//                            {
-//                                rand = (rand()%2); // creating random value (0 or 1)
-//                                initial_SA[x][y].label=rand;//randomly add an edge
-//                                if (rand == 1)
-//                                {
-//                                    visited [y] = 1;
-//                                    printf("\n Edge1 %d:(%d %d) energy:%d, label:%d",num_edges++,x,y,initial_SA[x][y].weight,initial_SA[x][y].label);
-//                                    for(n=1; n<=num_nodes; n++)
-//                                        if(n!=y)//find different edge connected to node x
-//                                            if (initial_SA[x][n].weight != MAX_ENERGY)//if edge is possible
-//                                                if(initial_SA[x][n].weight<= initial_SA[x][y].weight)// node can reach all other nodes with equal or lower tx power
-//                                                    if(visited[n]==0)//if node is not yet visited
-//                                                    {
-//                                                        visited[n]=1;
-//                                                        initial_SA[x][n].label = 1;
-//                                                        printf("\n Edge2 %d:(%d %d) energy:%d, label:%d",num_edges++,x,n,initial_SA[x][n].weight,initial_SA[x][n].label);
-//                                                        initial_SA[x][n].weight=initial_SA[n][x].weight=MAX_ENERGY;//make sure same edge is not chosen twice
-//                                                    }
-//                                    initial_SA[x][y].weight=initial_SA[y][x].weight=MAX_ENERGY;//make sure same edge is not chosen twice
-//                                }
-//                            }
-//        }
-//
-//    }
-//
-//
-//    return(0);
-//}
-//
-//void *item_data(int num_nodes)
-//{
-//    int i, distance;
-//    //ask for the distance needed of each edge the node takes and store them
-//    printf("\nEnter the network topology matrix:\n");
-//    for(i=1; i<=num_nodes; i++)
-//        {
-//            scanf("%d",&distance);
-//            edge_energy[i].weight=pow(distance,2);
-//            if(edge_energy[i].weight==0)
-//                edge_energy[i].weight=MAX_TX_DISTANCE;//set non-existing edges to a large number (infinity) to prevent being selected
-//        }
-//
-////    edge_energy[0].distance = 29;
-////    edge_energy[1].distance = 10;
-////    edge_energy[2].distance = 11;
-////    edge_energy[3].distance = 6;
-////    edge_energy[4].distance = 4;
-////    edge_energy[5].distance = 15;
-////    edge_energy[6].distance = 36;
-////    edge_energy[7].distance = 22;
-////    edge_energy[8].distance = 8;
-////    edge_energy[9].distance = 19;
-////    edge_energy[10].distance = 10;
-////    edge_energy[11].distance = 12;
-////    edge_energy[12].distance = 21;
-////    edge_energy[13].distance = 14;
-////    edge_energy[14].distance = 7;
-////    edge_energy[15].distance = 3;
-////    edge_energy[16].distance = 46;
-////    edge_energy[17].distance = 27;
-////    edge_energy[18].distance = 56;
-////    edge_energy[19].distance = 19;
-////    edge_energy[20].distance = 20;
-////    edge_energy[21].distance = 21;
-////    edge_energy[22].distance = 42;
-////    edge_energy[23].distance = 43;
-////    edge_energy[24].distance = 36;
-////    edge_energy[25].distance = 25;
-////    edge_energy[26].distance = 22;
-////    edge_energy[27].distance = 27;
-////    edge_energy[28].distance = 44;
-////    edge_energy[29].distance = 39;
-////    edge_energy[30].distance = 30;
-////    edge_energy[31].distance = 51;
-////    edge_energy[32].distance = 32;
-////    edge_energy[33].distance = 33;
-////    edge_energy[34].distance = 34;
-//
-//    return(0);
-//}
-//
+        num_edges =1;
+        printf("\n\nPopulation: %d ",i);
+        visited[1]=1;//set node one as the source node
 
-//float Objective_function(chrom ***next_population, int num_nodes,int i)
-//{
-//
-//    float new_cost=0.0;
-//   // float function_value;
-//
-//    new_cost = cost(next_population,num_nodes,i);
-// //   if ()//it does not include all nodes set to 0
-//
-// //minimise the function
-//
-//    return(new_cost);
-//}
+        while(num_edges < num_nodes)//have required #edges = #node-1
+        {
+            for(x=1; x<=num_nodes; x++)
+                for(y=1; y<=num_nodes; y++)//for all edges
+                    if(visited[x]!=0)//if node is visited
+                        if(current_population[i].gene[x][y].weight!=MAX_ENERGY) //if edge is possible
+                            if(visited[y]==0)//if node is not yet visited
+                            {
+                                rand = rand_binary();
+                                current_population[i].gene[x][y].label=rand;//randomly add an edge
+                                if (rand == 1)
+                                {
+                                    visited [y] = 1;
+                                    printf("\n Edge1 %d:(%d %d) energy:%.1f, label:%d",num_edges++,x,y,current_population[i].gene[x][y].weight,current_population[i].gene[x][y].label);
+                                    for(n=1; n<=num_nodes; n++)
+                                        if(n!=y)//find different edge connected to node x
+                                            if (current_population[i].gene[x][n].weight != MAX_ENERGY)//if edge is possible
+                                                if(current_population[i].gene[x][n].weight<= current_population[i].gene[x][y].weight)// node can reach all other nodes with equal or lower tx power
+                                                    if(visited[n]==0)//if node is not yet visited
+                                                    {
+                                                        visited[n]=1;
+                                                        current_population[i].gene[x][n].label = 1;
+                                                        printf("\n Edge2 %d:(%d %d) energy:%.1f, label:%d",num_edges++,x,n,current_population[i].gene[x][n].weight,current_population[i].gene[x][n].label);
+                                                        current_population[i].gene[x][n].weight=current_population[i].gene[n][x].weight=MAX_ENERGY;//make sure same edge is not chosen twice
+                                                    }
+                                    current_population[i].gene[x][y].weight=current_population[i].gene[y][x].weight=MAX_ENERGY;//make sure same edge is not chosen twice
+                                }
+                            }
+        }
 
+    }
+    //transfer original weight back
+    for(i=1; i<=pop_size; i++)
+        for(x=1; x<=num_nodes; x++)
+            for(y=1; y<=num_nodes; y++)
+                current_population[i].gene[x][y].weight = temp[i].gene[x][y].weight;
 
-//float cost(chrom ***next_population, int num_nodes,int i)
-//{
-//    float new_cost = 0.0;
-//    int x,y;
-//    float weight;
-//
-//    for(x=1; x<=num_nodes; x++)//for all edges
-//    {
-//        weight =0.0;//find the largest tx on each node
-//        for(y=1; y<=num_nodes; y++)
-//            if(next_population[i].gene[x][y].label == 1)
-//                    if(weight<next_population[i].gene[x][y].weight)//find highest energy used per node
-//                        weight = next_population[i].gene[x][y].weight;
-//
-//        new_cost += weight;//find total weight
-//    }
-//    printf("\n Total cost is %f\n\n", new_cost);
-//    return new_cost;
-//
-//}
+}
 
+void get_network_topology(int num_nodes, int pop_size, int visited[], chrom *temp, chrom *current_population)
+{
+    int i,x,y;
+    float distance;
+
+    //ask for the energy needed of each edge the node takes and store them
+    printf("\nEnter the network topology matrix:\n");
+    for(x=1; x<=num_nodes; x++)
+        for(y=1; y<=num_nodes; y++)
+        {
+            scanf("%f", &distance);
+            for(i=1; i<=pop_size; i++)
+                current_population[i].gene[x][y].weight = distance;
+        }
+    for(i=1; i<=pop_size; i++)
+        for(x=1; x<=num_nodes; x++)
+            for(y=1; y<=num_nodes; y++)
+            {
+                temp[i].gene[x][y].weight = current_population[i].gene[x][y].weight;//store data of weights as initial_SA.weight will be modified temporarily for calculations
+                current_population[i].gene[x][y].label =0;//initially start with no tree
+                visited[x]=0;//no nodes visited at the start
+            }
+
+}
+
+float Objective_function(int num_nodes,int i,chrom *next_population)
+{
+
+    float new_cost=0.0;
+   // float function_value;
+
+    new_cost = cost(num_nodes,i,next_population);
+ //   if ()//it does not include all nodes set to 0
+
+ //minimise the function
+
+    return(new_cost);
+}
+
+float cost(int num_nodes,int i,chrom *next_population)
+{
+    float new_cost = 0.0;
+    int x,y;
+    float weight;
+
+    for(x=1; x<=num_nodes; x++)//for all edges
+    {
+        weight =0.0;//find the largest tx on each node
+        for(y=1; y<=num_nodes; y++)
+            if(next_population[i].gene[x][y].label == 1)
+                    if(weight<next_population[i].gene[x][y].weight)//find highest energy used per node
+                        weight = next_population[i].gene[x][y].weight;
+
+        new_cost += weight;//find total weight
+    }
+    printf("\n Total cost is %.1f\n\n", new_cost);
+
+    return new_cost;
+}
 
 void *do_mutation_operator(int mutation,chrom ***next_population,int num_nodes, int pop_size, float mutation_rate)
 {
@@ -740,7 +632,7 @@ float get_mutation_rate(void)
 {
     float mutation_rate; //number of chromosomes entered
 
-enter:
+    enter:
     printf("Please enter (float) mutation rate (Minimum %d to Maximum %d):\t",MIN_MUTATION_RATE,MAX_MUTATION_RATE);// Ask for number of chromosomes
     scanf("%f",&mutation_rate); //get the number of chromosomes
 
@@ -754,7 +646,7 @@ int get_chromosome_size(void)
 {
     int num_nodes; //problem size
 
-    enter:
+enter:
     printf("Please enter no. of Nodes considered (Min %d to Max %d):\t",MIN_CHROMO_SIZE,MAX_CHROMO_SIZE);// Ask for number of chromosomes
     scanf("%d",&num_nodes); //get the number of chromosomes
 
@@ -801,7 +693,7 @@ int get_crossover_strategy(void)
 {
     int crossover; //number of population entered
 
-    enter:
+enter:
     printf("\n\tChoose a crossover strategy: \
                  \n\t\tSame Branches    \t 1       \
                  \n\t\tSwap Branches    \t 2       \
@@ -818,7 +710,7 @@ int get_selection_strategy(void)
 {
     int selection; //number of population entered
 
-    enter:
+enter:
     printf("\n\tChoose a selection strategy: \
                  \n\t\tElitism         \t 1       \
                  \n\t\tTournament      \t 2       \
@@ -846,7 +738,7 @@ enter:
     return num;
 }
 
-void intro_objective_function (void)
+void introduction (void)
 {
     printf("\n\n\n\n\n\nWelcome to the Genetic Algorithm coded by Daniella Bacud\n"); // Print introduction
 }
