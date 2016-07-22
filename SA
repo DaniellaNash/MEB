@@ -103,6 +103,7 @@ int rand_binary(void)
     int random;
 
     random = rand()%2;
+
     return random;
 }
 
@@ -172,9 +173,9 @@ float acceptance_prob(float T, float old_cost, float new_cost,edge** new_solutio
     float random;
 
     delta = (old_cost-new_cost);
-    ap = (exp(-delta/T)); //this is the typical equation used
+    ap = (exp(delta/T)); //this is the typical equation used
 
-    if(new_cost < old_cost)//if new_solution has less energy select it
+    if(delta >0)//if new_solution has less energy select it...i.e. if new_cost<old_cost
     {
         fprintf(fp,"NO");
         for(x=1; x<=num_nodes; x++)
@@ -184,9 +185,9 @@ float acceptance_prob(float T, float old_cost, float new_cost,edge** new_solutio
     }
     else //if new_solution uses more energy maybe select it
     {
-        random = rand_float();
-        //printf("***********************************rand: %f, ap: %f,delta: %f, T= %f", random,ap, delta, T);
-        if (ap < random)
+        random = rand_float();//random number between 0 and 1
+
+        if (ap > random)//if ap is closer to one the accpet
         {
             for(x=1; x<=num_nodes; x++)
                 for(y=1; y<=num_nodes; y++)
@@ -482,43 +483,6 @@ void *get_network_topology( int num_nodes, edge **initial_SA, edge** temp , int 
     return 0;
 
 }
-//not working
-int *generate_rand_matrix(int num_nodes, edge **initial_SA, edge** temp , int visited[])
-{
-    int x,y;
-    //ask for the energy needed of each edge the node takes and store them
-    printf("\nEnter the network topology matrix:\n");
-    for(x=1; x<=num_nodes; x++)
-        for(y=1; y<=num_nodes; y++)
-        {
-            initial_SA[x][y].weight= rand()%10;//rand from 0 to 100
-            if(rand_binary()==1)
-                initial_SA[x][y].weight=0.0;
-        }
-    for(x=1; x<=num_nodes; x++)
-        for(y=1; y<=num_nodes; y++)
-        {
-            initial_SA[x][y].weight= initial_SA[y][x].weight;//rand from 0 to 100
-            if (x==y||y==x)
-                initial_SA[y][x].weight=0.0;
-        }
-
-    for(x=1; x<=num_nodes; x++)
-    {
-        printf("\n");
-        for(y=1; y<=num_nodes; y++)
-        {
-            temp[x][y].weight = initial_SA[x][y].weight;//store data of weights as initial_SA.weight will be modified temporarily for calculations
-            initial_SA[x][y].label =0;//initially start with no tree
-            visited[x]=0;//no nodes visited at the start
-            printf(" %f",initial_SA[x][y].weight);
-        }
-    }
-
-
-    visited[1]=1;//set node one as the source node
-    return 0;
-}
 
 int get_num_nodes(void)
 {
@@ -586,10 +550,12 @@ int main()
 
     get_network_topology(num_nodes,initial_SA,temp,visited);//get network
     //generate_rand_matrix( num_nodes,initial_SA,temp , visited);
-    gen_init_solution(num_edges, num_nodes, visited,initial_SA, temp, current_SA);//generate initial random solution (TREE MST - no loops)
+    gen_init_solution(num_edges, num_nodes, visited,initial_SA, temp, current_SA);//generate initial random solution (TREE MST - no loops) good initial solution to start with
     old_cost = cost( num_nodes, current_SA);//print solution and cost
 
     printf("\n First iteration cost = %f\n",old_cost);
+
+    T = old_cost*1.5;//make To relative to initial cost by a factor of 1 to 2
 
     //main algorithm
     while (T > T_min)//max generation //CHANGE THIS BACK TO T<=T_min
