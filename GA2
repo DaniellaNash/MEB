@@ -66,7 +66,7 @@ void print_out_chroms(int num_nodes,int pop_size,chrom* next_population, int j, 
 
 //select strategy for each operator
 void *do_selection_operator(int selection,int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
-void *do_crossover_operator(int crossover,int num_nodes,int pop_size,int current_generation, chrom* next_population,chrom *temp,FILE *fp);
+void *do_crossover_operator(int crossover,int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
 void *do_mutation_operator(int mutation,int num_nodes,int pop_size,float mutation_rate, chrom* next_population,FILE *fp);
 
 //selection strategies
@@ -76,8 +76,9 @@ void *selection_roulettewheel(int num_nodes,int pop_size,int current_generation,
 void *selection_tournament(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
 
 //crossover strategies
-void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation, chrom* next_population,chrom *temp,FILE *fp);
-void *crossover_sameBranches2(int num_nodes,int pop_size,int current_generation,chrom* next_population, chrom* temp,FILE *fp);
+void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
+void *dfs_swap2d(int v, int num_nodes,chrom* next_population,int x ,int **visited);
+void *crossover_sBranches2(int num_nodes,int pop_size,int current_generation,chrom* next_population, chrom* temp,FILE *fp);
 void *crossover_swapBranches(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
 
 //mutation strategies
@@ -88,7 +89,6 @@ void *dfs(int v, int num_nodes, chrom* next_population,int i ,int visited[]);
 void *add_edge(int num_nodes,chrom* next_population, int j , int n, int m ,FILE *fp);
 void *dfs_swap(int v, int num_nodes,chrom* next_population,int x ,int visited[]);
 void *mutation_loopRemove(int num_nodes,int pop_size,int current_generation,float mutation_rate, chrom* next_population,FILE *fp);
-
 
 int main()
 {
@@ -126,10 +126,10 @@ int main()
         num_nodes = get_chromosome_size();  //get number of edges = number of nodes - 1
 
 //*****************************************************UNCOMMENT THESE LATER***********************************
-        mutation_rate = get_mutation_rate();
+//        mutation_rate = get_mutation_rate();
 //        selection = get_selection_strategy(); // get strategies for the operators
-//        crossover = get_crossover_strategy();
-        mutation = get_mutation_strategy();
+        crossover = get_crossover_strategy();
+//        mutation = get_mutation_strategy();
 //*************************************************************************************************************
 
         chrom* current_population;//initialize the population arrays
@@ -190,13 +190,23 @@ int main()
             fprintf(fp,"\n\t%i\t\t%.1f\t\t\t%.1f\t\t",current_generation,next_population[best_chrom].fitness_score,sum_energy);
             print_out_chroms(num_nodes, pop_size,next_population,best_chrom,1,current_generation,fp);//print out best chromosome
 
+//            for(j=1; j<=pop_size; j++)//all next_population should be transfered from current_population before printing out as we calculate objective function here.
+//            {
+//                printf("\n[%d]:",j);
+//                for(x=1;x<=num_nodes;x++)
+//                    for(y=1;y<=num_nodes;y++)
+//                        printf("%d",next_population[j].gene[x][y].label);
+//            }
+
+
+
 //*****************************************************UNCOMMENT THESE LATER***********************************
             //selection function
 //            do_selection_operator(selection, num_nodes, pop_size, current_generation, next_population,fp);
             //crossover function
-            //do_crossover_operator(crossover, num_nodes, pop_size, current_generation,temp, next_population,fp);
+            do_crossover_operator(crossover, num_nodes, pop_size, current_generation, next_population,fp);
 //            mutation function
-            do_mutation_operator(mutation, num_nodes, pop_size, mutation_rate, next_population,fp);
+//            do_mutation_operator(mutation, num_nodes, pop_size, mutation_rate, next_population,fp);
 //*************************************************************************************************************
             for(i=1; i<=pop_size; i++)
                 current_population[i]=next_population[i]; //copy the chromes of next population to current population
@@ -210,25 +220,27 @@ int main()
     return 0;
 }
 
-void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,chrom* next_population,chrom *temp,FILE *fp)//if doesnt work use MST
+void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,chrom* next_population,FILE *fp)//if doesnt work use MST
 {
     int i,j,x,y;
-    int num_edges =0;
+    int num_edges =1;
     int n_new, m_new;//join broken branch by edge n_new and m_new
-    int *visited;
+    int **visited;
+    int sameBranchDetected = FALSE;
     chrom* child;
 
     printf("\n\n\tSame Branches crossover:");
 
     //allocate memory of child
     child = malloc(num_nodes * sizeof(child));
-    visited = (int *)malloc(num_nodes * sizeof(int));
+    visited = malloc(num_nodes * sizeof(int*));
     if(child == NULL||visited==NULL)
         fprintf(fp,"ERROR1: Memory allocation failed!");
     for(x = 1; x <= num_nodes; x++)
     {
         child[x].gene = malloc(num_nodes * sizeof(edge*));
-        if(child[x].gene == NULL)
+        visited[x] = malloc(num_nodes * sizeof(int));
+        if(child[x].gene == NULL||visited[x]==NULL)
             fprintf(fp,"ERROR2: Memory allocation failed!");
         for(y = 1; y <= num_nodes; y++)
         {
@@ -238,14 +250,48 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
         }
     }
 
+    for(j=1;j<=pop_size;j++)//make storage for new solutions
+    {
+//        printf("\n\t**Chromosome [%d]:",j);
+        for(x=1;x<=num_nodes;x++)
+            for(y=1;y<=num_nodes;y++)
+            {
+
+                child[j].gene[x][y].label =0;
+//                printf("%d",next_population[j].gene[x][y].label);
+            }
+    }
+
     for(j=1; j<=pop_size; j+=2) //each parent
+    {
+        sameBranchDetected = FALSE;
         for(x=1; x<=num_nodes; x++)//check if edge exists in both
             for(y=1;y<=num_nodes;y++)
-                if ((next_population[j].gene[x][y].label==1||next_population[j].gene[y][x].label==1)&&(next_population[j+1].gene[x][y].label==1||next_population[j+1].gene[y][x].label==1))
+                if (next_population[j].gene[x][y].label==1||next_population[j].gene[y][x].label==1)
                 {
-                    child[j].gene[x][y].label =1;//set label to 1 for one directions for now
-                    child[j+1].gene[x][y].label =1;//do this for both children - both child will differ when the 'broken branches' are joined together randomly
+//                    printf("\nchrom %d (%d %d):label:%d.%d",j,x,y,next_population[j].gene[x][y].label==1,next_population[j].gene[y][x].label==1);
+                    if (next_population[j+1].gene[x][y].label==1||next_population[j+1].gene[y][x].label==1)
+                    {
+//                        printf("\nchrom %d (%d %d):label:%d.%d",j+1,x,y,next_population[j].gene[x][y].label==1,next_population[j].gene[y][x].label==1);
+                        child[j].gene[x][y].label =1;//set label to 1 for one directions for now
+                        child[j+1].gene[x][y].label =1;//do this for both children - both child will differ when the 'broken branches' are joined together randomly
+//                        printf("\n[%d %d] same edge (%d %d), label%d",j,j+1,x,y,next_population[j].gene[x][y].label);
+                        sameBranchDetected = TRUE;
+                    }
                 }
+        for(x=1; x<=num_nodes; x++)//delete duplicates
+            for(y=1;y<=num_nodes;y++)
+                if(child[j].gene[x][y].label==1)
+            {
+                child[j].gene[y][x].label =0;
+                child[j+1].gene[y][x].label =0;
+            }
+
+        if(sameBranchDetected==FALSE)
+            printf("\nno branch the same btw %d and %d",j,j+1);
+    }
+
+
     //now having copied over branches that are similar to both parents
     //dfs from node 1, then join a random non visited edge to the tree
     //set all connected nodes from that edge to visited
@@ -253,15 +299,26 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
     //until all nodes are connected - i.e. is a solution
     for(i=1;i<=pop_size;i++) //do this per solution
     {
+        num_edges = 1;
         add_again:
         for(x=1; x<=num_nodes; x++)//create storage space to list visited nodes
-            visited[x]=0;
-        dfs_swap(1,num_nodes,next_population,i, visited);//visited now has the list of nodes connected to 1 and nodes are set in the correct order
+            visited[i][x]=0;
+        dfs_swap2d(1,num_nodes,next_population,i, visited);//visited now has the list of nodes connected to 1 and nodes are set in the correct order
+
+        for(x=1; x<=num_nodes; x++)//check if all nodes are visited
+            if(visited[i][x]==1)
+                num_edges++;
+
+        if(num_edges >= (num_nodes-1))
+        {
+            goto done;
+            printf("\nall the same branches");
+        }
 
         n_new = rand_btw(1,num_nodes,0);//select two random nodes, n has to be connected to the source node
         m_new = rand_btw(1,num_nodes,n_new);
 
-        while(visited[n_new]==1 && visited[m_new]!=1)//make sure random node is in the correct branch
+        while(visited[i][n_new]==1 && visited[i][m_new]!=1)//make sure random node is in the correct branch
         {
             here2:
             n_new = rand_btw(1,num_nodes,0);
@@ -272,33 +329,35 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
             n_new = rand_btw(1,num_nodes,0);//select two random nodes
             m_new = rand_btw(1,num_nodes,n_new);
 
-            while(visited[n_new]==1 && visited[m_new]!=1)//make sure random node is in the correct branch
+            while(visited[i][n_new]==1 && visited[i][m_new]!=1)//make sure random node is in the correct branch
             {
                 goto here2;
             }
         }
 
-        num_edges = 0;
-        for(x=1; x<=num_nodes; x++)//check if all nodes are visited
-            if(visited[x]==1)
-                num_edges++;
-
-        printf("\n Add Edge1 (%d %d)",n_new,m_new);
+        printf("\n [%d] Add Edge (%d %d)",i,n_new,m_new);
         child[i].gene[n_new][m_new].label= 1;//add this random edge to the solution
-
+        num_edges++;
+        done:
+        printf("\n*****num_edges = %d",num_edges);
         while(num_edges<num_nodes)//num_edges = num_nodes -1
+        {
+            printf("****num_edges:%d,num_nodes:%d",num_edges,num_nodes);
             goto add_again;
+        }
     }
 
     for(i=1; i<pop_size+1; i++)//print out
     {
-        next_population[i]=child[i];
+        for(x=1; x<=num_nodes; x++)//check if edge exists in both
+            for(y=1;y<=num_nodes;y++)
+                next_population[i].gene[x][y].label=child[i].gene[x][y].label;
         print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
     }
     return 0;
 }
 
-void *crossover_sameBranches2(int num_nodes,int pop_size,int current_generation,chrom* next_population, chrom* temp,FILE *fp)//what happens if no common edge?
+void *crossover_sBranches2(int num_nodes,int pop_size,int current_generation,chrom* next_population, chrom* temp,FILE *fp)//what happens if no common edge?
 {
     int i,j,x,y,n;
     int num_edges =0;
@@ -519,6 +578,33 @@ void *crossover_swapBranches(int num_nodes,int pop_size,int current_generation, 
          print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
     }
 
+    return 0;
+}
+
+void *dfs_swap2d(int v, int num_nodes,chrom* next_population,int x ,int **visited)
+{
+    int i;
+
+	visited[x][v]=1;//mark the node as visited
+
+    for (i=1;i<=num_nodes;i++)//for all edges
+    {
+      //  if (i!=x &&v !=y)//not including newly added edge
+         if(!visited[x][i]==1)//with nodes not yet visited
+         {
+             if(next_population[x].gene[v][i].label !=1)//swap if wrong order
+                    if(next_population[x].gene[i][v].label ==1)//check is possible
+                    {
+                        next_population[x].gene[v][i].label = 1;
+                        next_population[x].gene[i][v].label = 0;
+                        printf("\n switch1 order of edge (%d %d) to (%d %d)",i,v,v,i);
+                    }
+            if(next_population[x].gene[v][i].label ==1)
+            {
+                dfs_swap2d(i, num_nodes, next_population,x,visited);
+            }
+         }
+    }
     return 0;
 }
 //***********************************************************************************************************************
@@ -1073,8 +1159,7 @@ void print_out_chroms(int num_nodes,int pop_size,chrom* next_population, int j, 
     int x,y;
     if (best == TRUE)
     {
-        printf("\n\n\tBest chromosome of Gen %d: [%d]\n", current_generation, j);
-        printf("\t");
+        printf("\n\n\tBest chromosome of Generation %d:\n \tChromosome[%d] =", current_generation, j);
         for(x=1; x<=num_nodes; x++)
         {
             fprintf(fp,".");
@@ -1162,7 +1247,7 @@ void get_network_topology(int num_nodes, int pop_size, int visited[], chrom *tem
     float distance;
 
     //ask for the energy needed of each edge the node takes and store them
-    printf("\n\tEnter the network topology matrix:\n");
+    printf("\n\tEnter the network topology matrix:\n\t");
     for(x=1; x<=num_nodes; x++)
         for(y=1; y<=num_nodes; y++)
         {
@@ -1247,12 +1332,12 @@ void *do_mutation_operator(int mutation,int num_nodes,int pop_size,float mutatio
     return 0;
 }
 
-void *do_crossover_operator(int crossover,int num_nodes,int pop_size,int current_generation, chrom* next_population,chrom *temp,FILE *fp)
+void *do_crossover_operator(int crossover,int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp)
 {
     switch (crossover)
     {
     case 1 :
-        crossover_sameBranches( num_nodes, pop_size,current_generation, next_population,temp, fp);
+        crossover_sameBranches( num_nodes, pop_size,current_generation, next_population, fp);
         break;
     case 2 :
         crossover_swapBranches( num_nodes, pop_size,current_generation, next_population,fp);
