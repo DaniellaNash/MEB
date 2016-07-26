@@ -70,7 +70,7 @@ void *do_crossover_operator(int crossover,int num_nodes,int pop_size,int current
 void *do_mutation_operator(int mutation,int num_nodes,int pop_size,float mutation_rate, chrom* next_population,FILE *fp);
 
 //selection strategies
-void *selection_elitism_sort(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
+void *selection_elitism_sort(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp,int show);
 void *selection_rank(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
 void *selection_roulettewheel(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
 void *selection_tournament(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
@@ -98,7 +98,7 @@ int main()
     float mutation_rate;
     int current_generation, num_gen;
     int selection, crossover, mutation;
-
+    int best_fitness =-1, best_chrom;
     float sum_energy;
     int* visited;
 
@@ -127,7 +127,7 @@ int main()
 
 //*****************************************************UNCOMMENT THESE LATER***********************************
 //        mutation_rate = get_mutation_rate();
-//        selection = get_selection_strategy(); // get strategies for the operators
+        selection = get_selection_strategy(); // get strategies for the operators
 //        crossover = get_crossover_strategy();
 //        mutation = get_mutation_strategy();
 //*************************************************************************************************************
@@ -174,15 +174,25 @@ int main()
             for(j=1; j<=pop_size; j++)//all next_population should be transfered from current_population before printing out as we calculate objective function here.
                 print_out_chroms( num_nodes, pop_size,next_population,j,0,current_generation,fp);//print out chromosome and its fitness score
 
-            selection_elitism_sort(num_nodes, pop_size, current_generation, next_population,fp);//put population in order of highest fitness score
+            best_fitness =-1;
+//            selection_elitism_sort(num_nodes, pop_size, current_generation, next_population,fp,0);//put population in order of highest fitness score
+            for(j=1;j<=pop_size;j++)//find the chromosome with the highest fitness
+            {
+                if (best_fitness<next_population[j].fitness_score)
+                {
+                    best_fitness=next_population[j].fitness_score;
+                    best_chrom = j;
+                }
 
-            sum_energy = cost(num_nodes,1,next_population);
-            fprintf(fp,"\n\t%i\t\t%.1f\t\t\t%.1f\t\t",current_generation,next_population[1].fitness_score,sum_energy);
-            print_out_chroms(num_nodes, pop_size,next_population,1,1,current_generation,fp);//print out best chromosome
+            }
+
+            sum_energy = cost(num_nodes,best_chrom,next_population);
+            fprintf(fp,"\n\t%i\t\t%.1f\t\t\t%.1f\t\t",current_generation,next_population[best_chrom].fitness_score,sum_energy);
+            print_out_chroms(num_nodes, pop_size,next_population,best_chrom,1,current_generation,fp);//print out best chromosome
 
 //*****************************************************UNCOMMENT THESE LATER***********************************
 //            //selection function
-          //  do_selection_operator(selection, num_nodes, pop_size, current_generation, next_population,fp);
+            do_selection_operator(selection, num_nodes, pop_size, current_generation, next_population,fp);
 //            //crossover function
             //do_crossover_operator(crossover, num_nodes, pop_size, current_generation,temp, next_population,fp);
 //            //mutation function
@@ -850,10 +860,12 @@ void *selection_tournament(int num_nodes,int pop_size,int current_generation, ch
 
     for(i=1; i<pop_size+1; i++)
     {
-        rand1_individual = generate_rand(1,pop_size);//get random individuals
-        rand2_individual = generate_rand(1,pop_size);//get random individuals
+        rand1_individual = rand_btw(1,pop_size,0);//get random individuals
+        rand2_individual = rand_btw(1,pop_size,rand1_individual);//get random individuals
 
         rand_r = generate_rand(0,10);//get random number r
+        printf("\nrand1:%d(%.1f), rand2:%d(%.1f), randr:%d, toursize:%d",rand1_individual,next_population[rand1_individual].fitness_score,rand2_individual, next_population[rand2_individual].fitness_score,rand_r,tournament_size);
+
         if(rand_r<tournament_size) // if r is less than the predetermined tournament size thatn select the fittest individula
         {
             if(next_population[rand1_individual].fitness_score < next_population[rand2_individual].fitness_score) // store the fittest individual
@@ -961,7 +973,7 @@ void *selection_rank(int num_nodes,int pop_size,int current_generation, chrom* n
     }
 
     printf("\n\n\tRank selection:");
-    selection_elitism_sort(num_nodes, pop_size, current_generation,next_population, fp);
+    selection_elitism_sort(num_nodes, pop_size, current_generation,next_population, fp,0);
 
     for (i=1; i<pop_size+1; i++)//copy over original data
         store_data[i] = next_population[i];
@@ -991,7 +1003,7 @@ void *selection_rank(int num_nodes,int pop_size,int current_generation, chrom* n
 }
 
 //***********************************************************************************************************************
-void *selection_elitism_sort(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp)
+void *selection_elitism_sort(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp, int show)
 {
     //descending order
     // population is sorted according to their fitness such that there is no way that strong and weak chromosomes reproduce.
@@ -1015,8 +1027,9 @@ void *selection_elitism_sort(int num_nodes,int pop_size,int current_generation, 
                 fprintf(fp,"ERROR22: Memory allocation failed!");
         }
     }
+    if(show ==1)
+        printf("\n\n\tElitism (sorting) selection:");
 
-    printf("\n\n\tElitism (sorting) selection:");
     for(i=1; i<=pop_size; i++)
         for(j=1; j<pop_size; j++) //dont include last chromosome as it has nothing to compare with
             if(next_population[j+1].fitness_score > next_population[j].fitness_score) // if the next chromosome is better than the previous (maximizing)
@@ -1026,9 +1039,10 @@ void *selection_elitism_sort(int num_nodes,int pop_size,int current_generation, 
                 next_population[j] = temporary[1];
             }
 
-    printf("\n\n\tDescending order of fitness:");
+    //printf("\n\n\tDescending order of fitness:");
     for(i=1; i<=pop_size; i++)
-        print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
+        if (show==1)
+            print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
 
     fflush(NULL);
     return(0);
@@ -1044,7 +1058,7 @@ void print_out_chroms(int num_nodes,int pop_size,chrom* next_population, int j, 
     int x,y;
     if (best == TRUE)
     {
-        printf("\n\n\tBest chromosome of Gen %d:\n", current_generation);
+        printf("\n\n\tBest chromosome of Gen %d: [%d]\n", current_generation, j);
         printf("\t");
         for(x=1; x<=num_nodes; x++)
         {
@@ -1238,7 +1252,7 @@ void *do_selection_operator(int selection,int num_nodes,int pop_size,int current
     switch (selection)
     {
     case 1 :
-        selection_elitism_sort(num_nodes, pop_size, current_generation, next_population,fp);
+        selection_elitism_sort(num_nodes, pop_size, current_generation, next_population,fp,1);
         break;
     case 2 :
         selection_tournament(num_nodes, pop_size, current_generation, next_population,fp);
