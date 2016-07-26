@@ -126,10 +126,10 @@ int main()
         num_nodes = get_chromosome_size();  //get number of edges = number of nodes - 1
 
 //*****************************************************UNCOMMENT THESE LATER***********************************
-//        mutation_rate = get_mutation_rate();
-        selection = get_selection_strategy(); // get strategies for the operators
+        mutation_rate = get_mutation_rate();
+//        selection = get_selection_strategy(); // get strategies for the operators
 //        crossover = get_crossover_strategy();
-//        mutation = get_mutation_strategy();
+        mutation = get_mutation_strategy();
 //*************************************************************************************************************
 
         chrom* current_population;//initialize the population arrays
@@ -191,12 +191,12 @@ int main()
             print_out_chroms(num_nodes, pop_size,next_population,best_chrom,1,current_generation,fp);//print out best chromosome
 
 //*****************************************************UNCOMMENT THESE LATER***********************************
-//            //selection function
-            do_selection_operator(selection, num_nodes, pop_size, current_generation, next_population,fp);
-//            //crossover function
+            //selection function
+//            do_selection_operator(selection, num_nodes, pop_size, current_generation, next_population,fp);
+            //crossover function
             //do_crossover_operator(crossover, num_nodes, pop_size, current_generation,temp, next_population,fp);
-//            //mutation function
-            //do_mutation_operator(mutation, num_nodes, pop_size, mutation_rate, next_population,fp);
+//            mutation function
+            do_mutation_operator(mutation, num_nodes, pop_size, mutation_rate, next_population,fp);
 //*************************************************************************************************************
             for(i=1; i<=pop_size; i++)
                 current_population[i]=next_population[i]; //copy the chromes of next population to current population
@@ -604,6 +604,7 @@ void *mutation_addRemove(int num_nodes,int pop_size,float mutation_rate, chrom* 
         random = generate_rand_float();//get value between 0 and 1
         if (random<mutation_rate) //mutation rate
         {
+            edgeRemoved = FALSE;//reset
             //remove a random edge
             while (edgeRemoved == FALSE)//remove a random edge
             {
@@ -629,16 +630,17 @@ void *mutation_addRemove(int num_nodes,int pop_size,float mutation_rate, chrom* 
                        next_population[i].gene[n][m].label =1;   //undelete the branch
                     goto redo;
                 }
-                printf("\n Remove Edge (%d %d)",n,m);
+                printf("\n\tRemove Edge (%d %d)",n,m);
                 next_population[i].gene[n][m].label =next_population[i].gene[m][n].label= 0;//remove this random edge from the solution
                 edgeRemoved = TRUE;//this separates the tree into two branches
             }
+
             //connect the two branches back together to make the solution tree
             add_edge( num_nodes, next_population,i,n, m,fp);
+            print_out_chroms(num_nodes,pop_size,next_population,i,0,0,fp);
         }
         else
-            printf(" N/A");
-        print_out_chroms(num_nodes,pop_size,next_population,i,0,0,fp);
+            printf(" \nN/A");
     }
     return 0;
 }
@@ -738,6 +740,7 @@ void *add_edge(int num_nodes,chrom* next_population, int j , int n, int m ,FILE 
         }
         dfs(n,num_nodes,next_population,j,branchN);
         dfs(m,num_nodes,next_population,j,branchM); //find nodes in n and m branch using DFS
+
        // printf("\n node N is connected to node:");
         for (i=1; i<=num_nodes; i++)
             if(branchN[i]==1)
@@ -755,6 +758,15 @@ void *add_edge(int num_nodes,chrom* next_population, int j , int n, int m ,FILE 
                     source=1;//make note of which branch the source node is in
 
             }
+
+        //select random node from each branch branchM and branchN
+        n_new = rand_btw(1,num_nodes,0);//select two random nodes
+        m_new = rand_btw(1,num_nodes,n_new);
+
+        while(branchN[n_new]==0)//make sure random node is in the correct branch
+            n_new = rand_btw(1,num_nodes,0);
+        while(branchM[m_new]==0)
+            m_new = rand_btw(1,num_nodes,0);
 
         while((n==n_new && m==m_new)|| (n==m_new && m==n_new))//make sure the edge is not the same as the one just removed
         {
@@ -784,12 +796,12 @@ void *add_edge(int num_nodes,chrom* next_population, int j , int n, int m ,FILE 
 
         if (source ==0)
         {
-            printf("\n Add Edge1 (%d %d)",n_new,m_new);
+            printf("\n\tAdd Edge (%d %d)",n_new,m_new);
             next_population[j].gene[n_new][m_new].label= 1;//add this random edge to the solution
         }
         else
         {
-            printf("\n Add Edge2 (%d %d)",m_new,n_new);
+            printf("\n\tAdd Edge (%d %d)",m_new,n_new);
             next_population[j].gene[m_new][n_new].label= 1;
         }
         edgeAdded = TRUE;
@@ -1056,10 +1068,6 @@ void *selection_elitism_sort(int num_nodes,int pop_size,int current_generation, 
 }
 
 //***********************************************************************************************************************
-//***********************************************************************************************************************
-//***********************************************************************************************************************
-//***********************************************************************************************************************
-//***********************************************************************************************************************
 void print_out_chroms(int num_nodes,int pop_size,chrom* next_population, int j, int best, int current_generation, FILE *fp)
 {
     int x,y;
@@ -1175,7 +1183,8 @@ void get_network_topology(int num_nodes, int pop_size, int visited[], chrom *tem
 float Objective_function(int num_nodes,int pop_size,int i,chrom *next_population)
 {
 
-    float new_cost=0.0, tree_cost = 0.0, max_cost=0.0, fitness_score = 0.0;
+    float new_cost=0.0, tree_cost = 0.0, fitness_score = 0.0;
+    float max_cost =0.0;
     int j;
 
      //calculate the highest cost for each population ---> make sure this function is integrated correctly to the main function
@@ -1192,7 +1201,8 @@ float Objective_function(int num_nodes,int pop_size,int i,chrom *next_population
      //calculate the cost of solution
      tree_cost = cost(num_nodes,i,next_population);
      printf("ChromCost = %.1f ",tree_cost);
-     fitness_score = max_cost - tree_cost; //at worst, the fitness function is 0.
+     //fitness_score = max_cost - tree_cost; //at worst, the fitness function is 0.
+     fitness_score = tree_cost;
           //fitness function is relative to the population
           //this minimises the function i.e. reverses the cost
 
@@ -1231,7 +1241,7 @@ void *do_mutation_operator(int mutation,int num_nodes,int pop_size,float mutatio
         //mutation_loopRemove(num_nodes, pop_size, next_population,fp);
         break;
     default :
-        printf("invalid input\n" );
+        printf("invalid input1\n" );
         break;
     }
     return 0;
@@ -1248,7 +1258,7 @@ void *do_crossover_operator(int crossover,int num_nodes,int pop_size,int current
         crossover_swapBranches( num_nodes, pop_size,current_generation, next_population,fp);
         break;
     default :
-        printf("invalid input\n" );
+        printf("invalid input2\n" );
         break;
     }
     return 0;
@@ -1271,7 +1281,7 @@ void *do_selection_operator(int selection,int num_nodes,int pop_size,int current
         selection_roulettewheel(num_nodes, pop_size, current_generation, next_population,fp);
         break;
     default :
-        printf("invalid input\n" );
+        printf("invalid input3\n" );
         break;
     }
     return 0;
