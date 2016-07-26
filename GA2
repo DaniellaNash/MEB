@@ -856,6 +856,9 @@ void *selection_tournament(int num_nodes,int pop_size,int current_generation, ch
         }
     }
 
+    for (i=1; i<pop_size+1; i++)//copy over original data
+        copy[i] = next_population[i];
+
     printf("\n\n\tTournament selection:");
 
     for(i=1; i<pop_size+1; i++)
@@ -882,6 +885,7 @@ void *selection_tournament(int num_nodes,int pop_size,int current_generation, ch
         }
     }
 
+    printf("\n\n\tNew population:");
     for(i=1; i<pop_size+1; i++)//print out
     {
         next_population[i] = copy[i];
@@ -915,6 +919,8 @@ void *selection_roulettewheel(int num_nodes,int pop_size,int current_generation,
                 fprintf(fp,"ERROR16: Memory allocation failed!");
         }
     }
+    for (i=1; i<pop_size+1; i++)//copy over original data
+        store_memory[i] = next_population[i];
 
     sum_likelihood[0]=0.0;
     printf("\n\n\tRoulette wheel selection:");
@@ -935,9 +941,11 @@ void *selection_roulettewheel(int num_nodes,int pop_size,int current_generation,
         {
             printf("\n\trandom %.2f and sumlikeli[%d] %.2f",r_random,i,sum_likelihood[i]);
             r_random =generate_rand_float();
-            if ((r_random> sum_likelihood[i]) && (likelihood[i]<likelihood[i+1]));
-            store_memory[i]=next_population[i];
+            if ((r_random> sum_likelihood[i]) && (likelihood[i]<likelihood[i+1]))
+                store_memory[i]=next_population[i];
         }
+
+    printf("\n\n\tNew population:");
     for(i=1; i<pop_size+1; i++) //print out new chromosome
     {
         next_population[i] = store_memory[i];
@@ -956,7 +964,7 @@ void *selection_rank(int num_nodes,int pop_size,int current_generation, chrom* n
     chrom* store_data;//store the data of original values
 
     //allocate memory of store_data
-    store_data = malloc(num_nodes * sizeof(store_data));
+    store_data = malloc(num_nodes * sizeof(chrom));
     if(store_data == NULL)
         fprintf(fp,"ERROR17: Memory allocation failed!");
     for(x = 1; x <= num_nodes; x++)
@@ -973,7 +981,7 @@ void *selection_rank(int num_nodes,int pop_size,int current_generation, chrom* n
     }
 
     printf("\n\n\tRank selection:");
-    selection_elitism_sort(num_nodes, pop_size, current_generation,next_population, fp,0);
+    selection_elitism_sort(num_nodes, pop_size, current_generation,next_population, fp,1);
 
     for (i=1; i<pop_size+1; i++)//copy over original data
         store_data[i] = next_population[i];
@@ -1002,7 +1010,6 @@ void *selection_rank(int num_nodes,int pop_size,int current_generation, chrom* n
     return(0);
 }
 
-//***********************************************************************************************************************
 void *selection_elitism_sort(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp, int show)
 {
     //descending order
