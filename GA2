@@ -19,7 +19,7 @@
 #define FALSE                       0
 #define MAX_ENERGY                  0
 #define MAX_TX_DISTANCE             999
-#define MAX_GENERATIONS             300
+#define MAX_GENERATIONS             30000
 
 //creating the Edge structure
 typedef struct Edge//per solution
@@ -127,8 +127,8 @@ int main()
 
 //*****************************************************UNCOMMENT THESE LATER***********************************
 //        mutation_rate = get_mutation_rate();
-//        selection = get_selection_strategy(); // get strategies for the operators
-        crossover = get_crossover_strategy();
+        selection = get_selection_strategy(); // get strategies for the operators
+//        crossover = get_crossover_strategy();
 //        mutation = get_mutation_strategy();
 //*************************************************************************************************************
 
@@ -160,6 +160,7 @@ int main()
                     fprintf(fp,"ERROR25: Memory allocation failed!");
             }
         }
+
 //*************************************************************************************************************
         get_network_topology( num_nodes, pop_size, visited, temp, current_population);//get the matrix of node connections
         gen_init_pop(num_nodes, pop_size, visited, temp,current_population);//generate random population of solution
@@ -175,48 +176,40 @@ int main()
                 print_out_chroms( num_nodes, pop_size,next_population,j,0,current_generation,fp);//print out chromosome and its fitness score
 
             best_fitness =-1;
-//            selection_elitism_sort(num_nodes, pop_size, current_generation, next_population,fp,0);//put population in order of highest fitness score
             for(j=1;j<=pop_size;j++)//find the chromosome with the highest fitness
-            {
                 if (best_fitness<next_population[j].fitness_score)
                 {
                     best_fitness=next_population[j].fitness_score;
                     best_chrom = j;
                 }
 
-            }
-
             sum_energy = cost(num_nodes,best_chrom,next_population);
             fprintf(fp,"\n\t%i\t\t%.1f\t\t\t%.1f\t\t",current_generation,next_population[best_chrom].fitness_score,sum_energy);
             print_out_chroms(num_nodes, pop_size,next_population,best_chrom,1,current_generation,fp);//print out best chromosome
 
-//            for(j=1; j<=pop_size; j++)//all next_population should be transfered from current_population before printing out as we calculate objective function here.
-//            {
-//                printf("\n[%d]:",j);
-//                for(x=1;x<=num_nodes;x++)
-//                    for(y=1;y<=num_nodes;y++)
-//                        printf("%d",next_population[j].gene[x][y].label);
-//            }
-
-
-
 //*****************************************************UNCOMMENT THESE LATER***********************************
             //selection function
-//            do_selection_operator(selection, num_nodes, pop_size, current_generation, next_population,fp);
+            do_selection_operator(selection, num_nodes, pop_size, current_generation, next_population,fp);
             //crossover function
-            do_crossover_operator(crossover, num_nodes, pop_size, current_generation, next_population,fp);
+//            do_crossover_operator(crossover, num_nodes, pop_size, current_generation, next_population,fp);
 //            mutation function
 //            do_mutation_operator(mutation, num_nodes, pop_size, mutation_rate, next_population,fp);
 //*************************************************************************************************************
             for(i=1; i<=pop_size; i++)
                 current_population[i]=next_population[i]; //copy the chromes of next population to current population
         }
+        //deallocate memory
+    for(x = 1; x <= num_nodes; x++)
+        for(y = 1; y <= num_nodes; y++)
+            free(temp[x].gene[y]);
+    for(x = 1; x <= num_nodes; x++)
+        free(temp[x].gene);
+    free(temp);
         restart = get_restart();
     }
     while(restart==1);
     fclose(fp);//closing the file from write mode
-    fflush(NULL);
-
+    //fflush(NULL);
     return 0;
 }
 
@@ -225,7 +218,7 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
     int i,j,x,y;
     int num_edges =1;
     int n_new, m_new;//join broken branch by edge n_new and m_new
-    int **visited;
+    int **visited_nodes;
     int sameBranchDetected = FALSE;
     chrom* child;
 
@@ -233,14 +226,14 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
 
     //allocate memory of child
     child = malloc(num_nodes * sizeof(child));
-    visited = malloc(num_nodes * sizeof(int*));
-    if(child == NULL||visited==NULL)
+    visited_nodes = malloc(num_nodes * sizeof(int*));
+    if(child == NULL||visited_nodes==NULL)
         fprintf(fp,"ERROR1: Memory allocation failed!");
     for(x = 1; x <= num_nodes; x++)
     {
         child[x].gene = malloc(num_nodes * sizeof(edge*));
-        visited[x] = malloc(num_nodes * sizeof(int));
-        if(child[x].gene == NULL||visited[x]==NULL)
+        visited_nodes[x] = malloc(num_nodes * sizeof(int));
+        if(child[x].gene == NULL||visited_nodes[x]==NULL)
             fprintf(fp,"ERROR2: Memory allocation failed!");
         for(y = 1; y <= num_nodes; y++)
         {
@@ -257,7 +250,6 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
             for(y=1;y<=num_nodes;y++)
             {
                 child[j].gene[x][y].label =0;
-                child[j].gene[x][y].weight =1.0;
 //                printf("%d",next_population[j].gene[x][y].label);
             }
     }
@@ -268,7 +260,6 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
         for(x=1; x<=num_nodes; x++)//check if edge exists in both
             for(y=1;y<=num_nodes;y++)
                 if(child[j].gene[x][y].weight != MAX_ENERGY)
-                {
                     if (next_population[j].gene[x][y].label==1)
                     {
     //                    printf("\nchrom %d (%d %d):label:%d.%d",j,x,y,next_population[j].gene[x][y].label==1,next_population[j].gene[y][x].label==1);
@@ -282,13 +273,13 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
                             sameBranchDetected = TRUE;
                         }
                     }
-                }
+
 
         if(sameBranchDetected==FALSE)
             printf("\nno branch the same btw %d and %d",j,j+1);
     }
 
-    for(j=1;j<=pop_size;j++)//make storage for new solutions
+    for(j=1;j<=pop_size;j++)
     {
         printf("\n\t**Chromosome [%d]:",j);
         for(x=1;x<=num_nodes;x++)
@@ -309,54 +300,48 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
     for(i=1;i<=pop_size;i++) //do this per solution
     {
         for(x=1; x<=num_nodes; x++)//create storage space to list visited nodes
-            visited[i][x]=0;
-        dfs_swap2d(1,num_nodes,child,i, visited);//visited now has the list of nodes connected to 1 and nodes are set in the correct order
+            visited_nodes[i][x]=0;
+        dfs_swap2d(1,num_nodes,child,i, visited_nodes);//visited now has the list of nodes connected to 1 and nodes are set in the correct order
 
         num_edges = -1;
         printf("\nNodes visited:");
         for(x=1; x<=num_nodes; x++)//check if all nodes are visited
-            if(visited[i][x]==1)
+            if(visited_nodes[i][x]==1)
             {
                 printf("%d",x);
                 num_edges++;
             }
-        add_again:
+
         printf("\nNumber of Edges [%d] = %d",i,num_edges);
 
-        if(num_edges != (num_nodes-1))//num_edges = num_nodes -1
+        while(num_edges < num_nodes-1)//num_edges = num_nodes -1
         {
             n_new = rand_btw(1,num_nodes,0);//select two random nodes, n has to be connected to the source node
             m_new = rand_btw(1,num_nodes,n_new);
 
-            while(visited[i][n_new]!=1 || visited[i][m_new]==1 ||next_population[i].gene[n_new][m_new].weight ==MAX_ENERGY)//make sure random node is in the correct branch
+            while(visited_nodes[i][n_new]!=1 || visited_nodes[i][m_new]==1 ||next_population[i].gene[n_new][m_new].weight ==MAX_ENERGY)//make sure random node is in the correct branch
             {
                 n_new = rand_btw(1,num_nodes,0);
                 m_new = rand_btw(1,num_nodes,n_new);
             }
-            printf("\n visited(%d) n:%d, not visited(%d) m:%d, weight(%.1f)",visited[i][n_new],n_new,visited[i][m_new],m_new,next_population[i].gene[n_new][m_new].weight);
+            printf("\n visited(%d) n:%d, not visited(%d) m:%d, weight(%.1f)",visited_nodes[i][n_new],n_new,visited_nodes[i][m_new],m_new,next_population[i].gene[n_new][m_new].weight);
             printf("\n [%d] Add Edge (%d %d)",i,n_new,m_new);
             child[i].gene[n_new][m_new].label= 1;//add this random edge to the solution
 
             for(x=1; x<=num_nodes; x++)//create storage space to list visited nodes
-                visited[i][x]=0;
-            dfs_swap2d(1,num_nodes,child,i, visited);//visited now has the list of nodes connected to 1 and nodes are set in the correct order
+                visited_nodes[i][x]=0;
+            dfs_swap2d(1,num_nodes,child,i, visited_nodes);//visited now has the list of nodes connected to 1 and nodes are set in the correct order
 
             num_edges = -1;
             printf("\nNodes visited:");
             for(x=1; x<=num_nodes; x++)//check if all nodes are visited
-            if(visited[i][x]==1)
-            {
-                printf("%d",x);
-                num_edges++;
-            }
-
-            if(num_edges != num_nodes-1)
-            {
-                printf("\ndo again as num_edges = %d",num_edges);
-                goto add_again;
-            }
-            printf("\n\tChrom [%d] is done,numedges = %d",i,num_edges);
+                if(visited_nodes[i][x]==1)
+                {
+                    printf("%d",x);
+                    num_edges++;
+                }
         }
+        printf("\n\tChrom [%d] is done,num_edges = %d",i,num_edges);
     }
 
     for(i=1; i<pop_size+1; i++)//print out
@@ -365,113 +350,6 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
             for(y=1;y<=num_nodes;y++)
                 next_population[i].gene[x][y].label=child[i].gene[x][y].label;
         print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
-    }
-    return 0;
-}
-
-void *crossover_sBranches2(int num_nodes,int pop_size,int current_generation,chrom* next_population, chrom* temp,FILE *fp)//what happens if no common edge?
-{
-    int i,j,x,y,n;
-    int num_edges =0;
-    int *visited;
-    float rand;
-    chrom* child;
-
-    printf("\n\n\tSame Branches crossover:");
-
-    //allocate memory of child
-    child = malloc(num_nodes * sizeof(child));
-    visited = (int *)malloc(num_nodes * sizeof(int));
-    if(child == NULL||visited==NULL)
-        fprintf(fp,"ERROR4: Memory allocation failed!");
-    for(x = 1; x <= num_nodes; x++)
-    {
-        child[x].gene = malloc(num_nodes * sizeof(edge*));
-        if(child[x].gene == NULL)
-            fprintf(fp,"ERROR5: Memory allocation failed!");
-        for(y = 1; y <= num_nodes; y++)
-        {
-            child[x].gene[y] = malloc(num_nodes * sizeof(edge));
-            if(child[x].gene[y] == NULL)
-                fprintf(fp,"ERROR6: Memory allocation failed!");
-        }
-    }
-
-    for(j=1; j<=pop_size; j+=2) //each parent
-        for(x=1; x<=num_nodes; x++)//check if edge exists in both
-            for(y=1;y<=num_nodes;y++)
-                if ((next_population[j].gene[x][y].label==1||next_population[j].gene[y][x].label==1)&&(next_population[j+1].gene[x][y].label==1||next_population[j+1].gene[y][x].label==1))
-                {
-                    child[j].gene[x][y].label =1;//set label to 1 for one directions for now
-                    child[j+1].gene[x][y].label =1;//do this for both children - both child will differ when the 'broken branches' are joined together randomly
-                }
-    //now having copied over branches that are similar to both parents
-    //dfs from node 1, then join a random non visited edge to the tree
-    //set all connected nodes from that edge to visited
-    //dfs again from 1 (dfs swap along the way) and do as previous
-    //until all nodes are connected - i.e. is a solution
-    for(i=1; i<=pop_size; i++) //for each chromosome
-    {
-        for(j=1; j<=num_nodes; j++) //for each solution clear the visited list
-            visited[j]=0;
-
-        num_edges =1;
-        printf("\n\n\tPopulation: %d ",i);
-        visited[1]=1;//set node one as the source node
-
-        while(num_edges < num_nodes)//have required #edges = #node-1
-        {
-            for(x=1; x<=num_nodes; x++)
-                for(y=1; y<=num_nodes; y++)//for all edges
-                {
-                    if((child[i].gene[x][y].label==1)||(child[i].gene[y][x].label==1))
-                    {
-                        visited[x]=1;
-                        visited [y] =1;
-                        child[i].gene[x][y].weight=child[i].gene[y][x].weight=MAX_ENERGY;//make sure same edge is not chosen twice
-                    }
-                    if(visited[x]!=0)//if node is visited
-                        if(child[i].gene[x][y].weight!=MAX_ENERGY) //if edge is possible
-                            if(visited[y]==0)//if node is not yet visited
-                            {
-                                rand = rand_binary();
-                                 child[i].gene[x][y].label=rand;//randomly add an edge
-                                if (rand == 1)
-                                {
-                                    visited [y] = 1;
-                                    printf("\n\t Edge1 %d:(%d %d) energy:%.1f, label:%d",num_edges++,x,y,child[i].gene[x][y].weight,child[i].gene[x][y].label);
-                                    for(n=1; n<=num_nodes; n++)
-                                        if(n!=y)//find different edge connected to node x
-                                            if (child[i].gene[x][n].weight != MAX_ENERGY)//if edge is possible
-                                                if(child[i].gene[x][n].weight<= child[i].gene[x][y].weight)// node can reach all other nodes with equal or lower tx power
-                                                    if(visited[n]==0)//if node is not yet visited
-                                                    {
-                                                        visited[n]=1;
-                                                        child[i].gene[x][n].label = 1;
-                                                        printf("\n\t Edge2 %d:(%d %d) energy:%.1f, label:%d",num_edges++,x,n,child[i].gene[x][n].weight,child[i].gene[x][n].label);
-                                                        child[i].gene[x][n].weight=child[i].gene[n][x].weight=MAX_ENERGY;//make sure same edge is not chosen twice
-                                                    }
-                                    child[i].gene[x][y].weight=child[i].gene[y][x].weight=MAX_ENERGY;//make sure same edge is not chosen twice
-                                }
-                            }
-                }
-        }
-    }
-
-    //transfer original weight back
-    for(i=1; i<=pop_size; i++)
-        for(x=1; x<=num_nodes; x++)
-            for(y=1; y<=num_nodes; y++)
-                child[i].gene[x][y].weight = temp[i].gene[x][y].weight;
-
-    //get everything in the right order
-    for(i=1; i<=pop_size; i++)
-        dfs_swap(1,num_nodes,child,i,visited);
-
-    for(i=1; i<pop_size+1; i++)//print out
-    {
-         next_population[i]=child[i];
-         print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
     }
     return 0;
 }
@@ -1000,7 +878,7 @@ void *selection_tournament(int num_nodes,int pop_size,int current_generation, ch
         next_population[i] = copy[i];
         print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
     }
-    fflush(NULL);
+    //fflush(NULL);
     return(0);
 }
 
@@ -1060,7 +938,7 @@ void *selection_roulettewheel(int num_nodes,int pop_size,int current_generation,
         next_population[i] = store_memory[i];
         print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
     }
-    fflush(NULL);
+    //fflush(NULL);
     return(0);
 }
 
@@ -1115,7 +993,7 @@ void *selection_rank(int num_nodes,int pop_size,int current_generation, chrom* n
         next_population[i] = store_data[i];//put data back
         print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
     }
-    fflush(NULL);
+    //fflush(NULL);
     return(0);
 }
 
@@ -1160,7 +1038,7 @@ void *selection_elitism_sort(int num_nodes,int pop_size,int current_generation, 
         if (show==1)
             print_out_chroms(num_nodes,pop_size,next_population,i,0,current_generation,fp);
 
-    fflush(NULL);
+    //fflush(NULL);
     return(0);
 }
 
