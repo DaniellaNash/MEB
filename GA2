@@ -199,13 +199,6 @@ int main()
             for(i=1; i<=pop_size; i++)
                 current_population[i]=next_population[i]; //copy the chromes of next population to current population
         }
-        //deallocate memory
-    for(x = 1; x <= num_nodes; x++)
-        for(y = 1; y <= num_nodes; y++)
-            free(temp[x].gene[y]);
-    for(x = 1; x <= num_nodes; x++)
-        free(temp[x].gene);
-    free(temp);
         restart = get_restart();
     }
     while(restart==1);
@@ -251,6 +244,7 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
             for(y=1;y<=num_nodes;y++)
             {
                 child[j].gene[x][y].label =0;
+                child[j].gene[x][y].weight = next_population[j].gene[x][y].weight;
 //                printf("%d",next_population[j].gene[x][y].label);
             }
     }
@@ -274,8 +268,6 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
                             sameBranchDetected = TRUE;
                         }
                     }
-
-
         if(sameBranchDetected==FALSE)//if no similar edge btw parents, child is a copy of their respective parent
         {
             printf("\nno branch the same btw %d and %d",j,j+1);
@@ -435,6 +427,7 @@ void *crossover_swapBranches2(int num_nodes,int pop_size,int current_generation,
                                 storage[j].gene[x][y].label=0;//temporarily delete common branch
                                 storage[j+1].gene[x][y].label=0;//temporarily delete common branch
                                 children[j].gene[y][x].weight =children[j].gene[x][y].weight = MAX_ENERGY;
+                                printf("\nCommon edge found:(%d %d)",x,y);
                             }
                         }
 
