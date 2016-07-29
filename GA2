@@ -79,6 +79,7 @@ void *selection_tournament(int num_nodes,int pop_size,int current_generation, ch
 void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
 void *dfs_swap2d(int v, int num_nodes,chrom* next_population,int x ,int **visited);
 void *crossover_sBranches2(int num_nodes,int pop_size,int current_generation,chrom* next_population, chrom* temp,FILE *fp);
+void *dfs2d(int v, int num_nodes, chrom* next_population,int i ,int **visited,int connected_node);
 void *crossover_swapBranches(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp);
 
 //mutation strategies
@@ -364,11 +365,14 @@ void *crossover_sameBranches(int num_nodes,int pop_size,int current_generation,c
 
 void *crossover_swapBranches2(int num_nodes,int pop_size,int current_generation, chrom* next_population,FILE *fp)//what happens if no common edge?
 {
-    int i,j,x,y;
+    int i,j,x,y,a,b,c,d;
     int n_new,m_new;
+    int n,m;
+    int set;
+    int connected_node;
     int num_edges =-1;
     int *branch1, *branch2, *branch3;
-    int **visited;
+    int **visited,**loop_branch;
     chrom* children;
     chrom* storage;
     int same_edgefound =0;
@@ -382,14 +386,16 @@ void *crossover_swapBranches2(int num_nodes,int pop_size,int current_generation,
     branch2 = (int *)malloc(num_nodes * sizeof(int));
     branch3 = (int *)malloc(num_nodes * sizeof(int));
     visited = malloc(num_nodes * sizeof(int*));
-    if(children == NULL||branch1==NULL||branch2==NULL||branch3==NULL||visited==NULL||storage==NULL)
+    loop_branch = malloc(num_nodes * sizeof(int*));
+    if(children == NULL||branch1==NULL||branch2==NULL||branch3==NULL||visited==NULL||loop_branch==NULL||storage==NULL)
         fprintf(fp,"ERROR7: Memory allocation failed!");
     for(x = 1; x <= num_nodes; x++)
     {
         children[x].gene = malloc(num_nodes * sizeof(edge*));
         storage[x].gene = malloc(num_nodes * sizeof(edge*));
         visited[x] = malloc(num_nodes * sizeof(int));
-        if(children[x].gene == NULL||storage[x].gene == NULL||visited[x]==NULL)
+        loop_branch[x] = malloc(num_nodes * sizeof(int));
+        if(children[x].gene == NULL||storage[x].gene == NULL||visited[x]==NULL||loop_branch[x]==NULL)
             fprintf(fp,"ERROR8: Memory allocation failed!");
         for(y = 1; y <= num_nodes; y++)
         {
@@ -467,6 +473,7 @@ void *crossover_swapBranches2(int num_nodes,int pop_size,int current_generation,
                 branch1[x]=0;
                 branch2[x]=0;
             }
+
             for(x=1; x<=num_nodes; x++)//find the branch connected to each side
                 for(y=1;y<=num_nodes;y++)
                     if(children[j].gene[x][y].label==1)
@@ -499,9 +506,39 @@ void *crossover_swapBranches2(int num_nodes,int pop_size,int current_generation,
 
         }
         //check for loops
-        //now delete any loops
+        //find each edge connected to each node
+        //for each edge where the node is the end side i.e. 'descendent' do dfs to find the nodes connected to each branch
+        //if any node is present in any of the branches (excluding the source node 1), then there is a loop present
+        //delete any edge present in the two branches to break the loop
+
+        for(x=1;x<=num_nodes;x++)//for each node
+        {
+            for(y=1;y<=num_nodes;y++)
+                if(children[j].gene[x][y].label==1)//for each edge connected to that node edge
+                    for(connected_node=1;connected_node<=num_nodes;connected_node++)
+                        if(children[j].gene[y][connected_node].label==1)
+                            dfs2d(y,num_nodes,children,j,loop_branch,connected_node);//
+
+            for(a=1;a<=num_nodes;a++)
+                for(b=1;b<=num_nodes;b++)
+                    for(c=1;c<=num_nodes;c++)
+                        for(d=1;d<=num_nodes;d++)
+                            if(loop_branch[a][b]==loop_branch[c][d])
+                                {
+                                    //loop exist btw branch  loop_branch[a] and loop_branch[c]
+                                    printf("\n LOOP present");
+                                   //delete loop by deleting edge
+                                    printf("\n\tRemove Edge (%d %d)",x,y);
+                                    children[j].gene[x][a].label =children[j].gene[a][x].label= 0;//remove this random edge from the solution
+                                }
+        }
 
         //dfs swap again
+        //get it in the correct order
+            for(x=1; x<=num_nodes; x++)//create storage space to list nodes in each branch
+                branch3[x]=0;
+
+            dfs_swap(1,num_nodes,children,j,branch3);
 
         //make sure all nodes are visited and dfs swap again to get correct order
         for(x=1; x<=num_nodes; x++)//create storage space to list visited nodes
@@ -567,7 +604,6 @@ void *crossover_swapBranches(int num_nodes,int pop_size,int current_generation, 
     int **visited;
     chrom* children;
     chrom* storage;
-    int same_edgefound =0;
 
     printf("\n\n\tSwap Branches crossover:");
 
@@ -652,7 +688,15 @@ void *crossover_swapBranches(int num_nodes,int pop_size,int current_generation, 
             branch3[x]=0;
 
         dfs_swap(1,num_nodes,children,j,branch3);
+
         //check for loops
+        //find each edge connected to each node
+        //for each edge where the node is the end side i.e. 'descendent' do dfs to find the nodes connected to each branch
+        //if any node is present in any of the branches (excluding the source node 1), then there is a loop present
+        //delete any edge present in the two branches to break the loop
+
+
+
         //now delete any loops
 
         //dfs swap again
@@ -712,7 +756,6 @@ void *crossover_swapBranches(int num_nodes,int pop_size,int current_generation, 
     return 0;
 }
 
-
 void *dfs_swap2d(int v, int num_nodes,chrom* next_population,int x ,int **visited)
 {
     int i;
@@ -738,6 +781,19 @@ void *dfs_swap2d(int v, int num_nodes,chrom* next_population,int x ,int **visite
     }
     return 0;
 }
+
+void *dfs2d(int v, int num_nodes, chrom* next_population,int i ,int **visited,int connected_node)
+{
+    int x;
+
+    visited[v][connected_node]=1;
+    for (x=1; x<=num_nodes; x++)
+        if(next_population[i].gene[v][x].label==1||next_population[i].gene[x][v].label==1)
+            if (!visited[v][x]==1) //if not yet visited
+                dfs2d(v, num_nodes, next_population,i,visited,x );
+    return 0;
+}
+
 //***********************************************************************************************************************
 //***********************************************************************************************************************
 //***********************************************************************************************************************
